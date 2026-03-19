@@ -1815,6 +1815,28 @@ function forceSyncToCloud() {
     });
 }
 
+function forceLoadFromCloud() {
+  toast('Chargement depuis Firebase…', 'info');
+  STORE.get().then(snap => {
+    if (!snap.exists) { toast('Aucune donnée dans Firebase', 'error'); return; }
+    const d = snap.data();
+    const fbRecipes = d.recipes || [];
+    if (!fbRecipes.length) { toast('Firebase est vide', 'error'); return; }
+    if (!confirm(`Charger ${fbRecipes.length} recettes depuis Firebase ?\n\nVos recettes locales (${recipes.length}) seront remplacées.`)) return;
+    recipes = fbRecipes;
+    mealPlan = d.mealPlan || {};
+    customCats = d.customCats || [];
+    localStorage.setItem('mes-recettes', JSON.stringify(recipes));
+    localStorage.setItem('mes-repas', JSON.stringify(mealPlan));
+    localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
+    render(); renderSidebar(); renderTagCloud(); renderCatSelect();
+    toast(`✓ ${fbRecipes.length} recettes chargées depuis Firebase !`);
+  }).catch(e => {
+    alert('Erreur Firebase : ' + e.message);
+    toast('Erreur de connexion', 'error');
+  });
+}
+
 function exportRecipes() {
   if (!recipes.length) { toast('Aucune recette à exporter', 'info'); return; }
   const json = JSON.stringify(recipes, null, 2);
