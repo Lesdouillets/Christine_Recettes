@@ -76,6 +76,32 @@ let weekStart      = getMonday(new Date());
 let currentDetailId = null;
 let pickerSlot     = null;
 
+// ── PHOTOS LOCALES (stockage séparé, jamais écrasé par Firebase) ──────────
+// { [recipeId]: "data:image/..." }
+function loadPhotoStore() {
+  try { return JSON.parse(localStorage.getItem('mes-recettes-photos') || '{}'); } catch { return {}; }
+}
+function savePhotoStore(map) {
+  localStorage.setItem('mes-recettes-photos', JSON.stringify(map));
+}
+// Extrait les photos base64 des recettes → les met dans le store séparé
+function migratePhotosToStore(arr) {
+  const map = loadPhotoStore();
+  let changed = false;
+  arr.forEach(r => {
+    if (r.photo && r.photo.startsWith('data:') && !map[r.id]) {
+      map[r.id] = r.photo; changed = true;
+    }
+  });
+  if (changed) savePhotoStore(map);
+  return map;
+}
+// Fusionne les photos du store dans un tableau de recettes
+function mergePhotos(arr) {
+  const map = loadPhotoStore();
+  return arr.map(r => (map[r.id] && !r.photo) ? {...r, photo: map[r.id]} : r);
+}
+
 // ── PERSISTANCE ───────────────────────────────────────
 function load() {
   // 1) Affichage immédiat depuis le cache local
@@ -83,6 +109,9 @@ function load() {
   try { mealPlan   = JSON.parse(localStorage.getItem('mes-repas')            || '{}'); } catch { mealPlan = {}; }
   try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
   try { urlTodo    = JSON.parse(localStorage.getItem('mes-urls-todo')         || '[]'); } catch { urlTodo = []; }
+  // Migrer les photos base64 vers le store séparé + les fusionner
+  migratePhotosToStore(recipes);
+  recipes = mergePhotos(recipes);
 
   // 2) Synchronisation temps réel via Firebase
   STORE.onSnapshot(snap => {
@@ -114,11 +143,7 @@ function load() {
       return;
     }
 
-    // Conserver les photos locales (base64) que Firebase ne stocke pas
-    const localPhotos = {};
-    recipes.forEach(r => { if (r.photo && r.photo.startsWith('data:')) localPhotos[r.id] = r.photo; });
-    const fbRecs = d.recipes || [];
-    recipes    = fbRecs.map(r => localPhotos[r.id] ? {...r, photo: localPhotos[r.id]} : r);
+    recipes    = mergePhotos(d.recipes || []);
     mealPlan   = d.mealPlan   || {};
     customCats = d.customCats || [];
     // Mettre à jour le cache local
@@ -142,7 +167,9 @@ function stripForCloud(arr) {
 }
 
 function save() {
-  // Cache local immédiat (avec photos base64)
+  // Migrer les photos base64 vers le store séparé (jamais perdu)
+  migratePhotosToStore(recipes);
+  // Cache local immédiat
   localStorage.setItem('mes-recettes',          JSON.stringify(recipes));
   localStorage.setItem('mes-repas',             JSON.stringify(mealPlan));
   localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
@@ -1838,10 +1865,7 @@ function forceLoadFromCloud() {
     const fbRecipes = d.recipes || [];
     if (!fbRecipes.length) { toast('Firebase est vide', 'error'); return; }
     if (!confirm(`Charger ${fbRecipes.length} recettes depuis Firebase ?\n\nVos recettes locales (${recipes.length}) seront remplacées.`)) return;
-    // Conserver les photos locales (base64) que Firebase ne stocke pas
-    const localPhotoMap = {};
-    recipes.forEach(r => { if (r.photo && r.photo.startsWith('data:')) localPhotoMap[r.id] = r.photo; });
-    recipes = fbRecipes.map(r => localPhotoMap[r.id] ? {...r, photo: localPhotoMap[r.id]} : r);
+    recipes = mergePhotos(fbRecipes);
     mealPlan = d.mealPlan || {};
     customCats = d.customCats || [];
     localStorage.setItem('mes-recettes', JSON.stringify(recipes));
