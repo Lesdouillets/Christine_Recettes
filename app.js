@@ -692,6 +692,47 @@ function getPhotoSrc(r) {
   return generatePlaceholderSvg(r);
 }
 
+// ── DICTIONNAIRE FR → EN POUR RECHERCHE PHOTO ────────
+const FR_TO_EN = {
+  'poulet':'chicken','boeuf':'beef','veau':'veal','agneau':'lamb','porc':'pork',
+  'saumon':'salmon','thon':'tuna','cabillaud':'cod','crevettes':'shrimp','crevette':'shrimp',
+  'moules':'mussels','lardons':'bacon','jambon':'ham','saucisse':'sausage',
+  'tomate':'tomato','tomates':'tomatoes','pomme':'apple','poire':'pear',
+  'fraise':'strawberry','fraises':'strawberries','framboise':'raspberry','framboises':'raspberries',
+  'citron':'lemon','orange':'orange','mangue':'mango','avocat':'avocado',
+  'banane':'banana','cerise':'cherry','cerises':'cherries','peche':'peach','abricot':'apricot',
+  'chocolat':'chocolate','vanille':'vanilla','caramel':'caramel','miel':'honey',
+  'fromage':'cheese','beurre':'butter','creme':'cream','lait':'milk','oeuf':'egg','oeufs':'eggs',
+  'tarte':'tart','gateau':'cake','gateaux':'cakes','soupe':'soup','salade':'salad',
+  'pates':'pasta','riz':'rice','pain':'bread','brioche':'brioche','baguette':'baguette',
+  'quiche':'quiche','crepe':'crepe','crepes':'crepes','galette':'galette','galettes':'galettes',
+  'gratin':'gratin','fondue':'fondue','ratatouille':'ratatouille','couscous':'couscous',
+  'courgette':'zucchini','aubergine':'eggplant','champignon':'mushroom','champignons':'mushrooms',
+  'oignon':'onion','oignons':'onions','ail':'garlic','carotte':'carrot','carottes':'carrots',
+  'poivron':'bell pepper','epinard':'spinach','brocoli':'broccoli','chou':'cabbage',
+  'asperge':'asparagus','poireau':'leek','fenouil':'fennel','betterave':'beet',
+  'risotto':'risotto','curry':'curry','tajine':'tagine','wok':'stir fry',
+  'pancakes':'pancakes','muffin':'muffin','cookie':'cookie','brownie':'brownie',
+  'tiramisu':'tiramisu','mousse':'mousse','flan':'flan','cheesecake':'cheesecake',
+  'clafoutis':'clafoutis','eclair':'eclair','macaron':'macaron','croissant':'croissant',
+  'burger':'burger','pizza':'pizza','wrap':'wrap','sandwich':'sandwich',
+  'veloute':'velouté soup','bisque':'bisque','pot':'pot','rouleaux':'spring rolls',
+  'fondant':'lava cake','moelleux':'soft cake','financier':'financier cake',
+  'panna':'panna cotta','cotta':'panna cotta','creme brulee':'crème brûlée',
+};
+
+function titleToEnglishQuery(name) {
+  const clean = name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ');
+  const STOP = ['de','du','la','le','les','au','aux','et','a','en','un','une','des',
+                'avec','pour','sur','sans','mon','ma','mes','notre','ses','faire',
+                'recette','maison','facile','rapide','simple'];
+  const words = clean.split(/\s+/).filter(w => w.length > 1 && !STOP.includes(w));
+  const translated = words.map(w => FR_TO_EN[w] || w);
+  return translated.slice(0, 4).join(' ');
+}
+
 // ── GÉNÉRER PHOTO POUR LE FORMULAIRE ─────────────────
 async function generatePhotoForForm() {
   const name = document.getElementById('f-name').value.trim();
@@ -700,30 +741,55 @@ async function generatePhotoForForm() {
   if (!name) { toast('Saisissez d\'abord le nom de la recette', 'info'); return; }
 
   btn.disabled = true;
-  btn.textContent = '…';
+  btn.innerHTML = '<span style="opacity:.6">Recherche…</span>';
 
+  const query = titleToEnglishQuery(name);
   let photoUrl = null;
 
-  // 1) TheMealDB
+  // Extrait le mot-clé alimentaire principal (premier mot traduit non vide)
+  const mainWord = query.split(' ').find(w => w.length > 2) || query;
+
+  // 1) TheMealDB — recherche par nom complet traduit
   try {
-    const words = name.split(/\s+/).slice(0, 3).join(' ');
-    const resp  = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(words)}`);
-    const data  = await resp.json();
+    const resp = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(query)}`);
+    const data = await resp.json();
     if (data.meals?.[0]?.strMealThumb) photoUrl = data.meals[0].strMealThumb + '/preview';
   } catch(e) {}
 
-  // 2) Fallback Unsplash par catégorie
-  if (!photoUrl) photoUrl = CAT_FALLBACK_PHOTOS[cat] || CAT_FALLBACK_PHOTOS['plat'];
+  // 2) TheMealDB — essaie chaque mot traduit comme ingrédient jusqu'à trouver
+  if (!photoUrl) {
+    const words = query.split(' ').filter(w => w.length > 2);
+    for (const word of words) {
+      try {
+        const resp = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${encodeURIComponent(word)}`);
+        const data = await resp.json();
+        if (data.meals?.length) {
+          const pick = data.meals[Math.floor(Math.random() * Math.min(5, data.meals.length))];
+          photoUrl = pick.strMealThumb + '/preview';
+          break;
+        }
+      } catch(e) {}
+    }
+  }
 
-  // Mettre à jour le champ URL et l'aperçu
+  // 3) Pollinations.ai — génération IA basée sur le nom exact de la recette
+  if (!photoUrl) {
+    const aiPrompt = `professional food photography, ${name}, appetizing dish, white background, soft lighting, high quality`;
+    photoUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(aiPrompt)}?width=400&height=300&nologo=true&seed=${Date.now() % 9999}`;
+    btn.innerHTML = '<span style="opacity:.6">Génération IA…</span>';
+  }
+
+  // Mettre à jour champ et aperçu
   document.getElementById('f-photo-url').value = photoUrl;
   const wrap = document.getElementById('photo-preview-wrap');
   const prev = document.getElementById('photo-preview');
-  prev.src = photoUrl; wrap.style.display = '';
+  prev.src = photoUrl;
+  wrap.style.display = '';
 
   btn.disabled = false;
   btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="8"/><path d="M6 10c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4"/><circle cx="10" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg> Générer';
-  toast('Photo générée ✓');
+  const isAI = photoUrl.includes('pollinations.ai');
+  toast(isAI ? '✨ Photo IA générée pour « '+name+' » — cliquez pour une autre' : 'Photo trouvée — cliquez pour une autre');
 }
 
 // Async: try TheMealDB → category fallback → keep SVG
