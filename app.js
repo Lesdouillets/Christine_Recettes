@@ -47,6 +47,19 @@ const AISLE_KW = {
 const DAYS_FR   = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const MONTHS_FR = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
 
+// ── FIREBASE ──────────────────────────────────────────
+firebase.initializeApp({
+  apiKey:            "AIzaSyB-vaVqrejkRAiW5q3sQvy9crl5RzDeIzc",
+  authDomain:        "mes-recettes-bd049.firebaseapp.com",
+  projectId:         "mes-recettes-bd049",
+  storageBucket:     "mes-recettes-bd049.firebasestorage.app",
+  messagingSenderId: "239169207922",
+  appId:             "1:239169207922:web:1b3d67548cc7bbd8ad0ceb"
+});
+const db    = firebase.firestore();
+const STORE = db.collection('data').doc('main');
+let _ownWrite = false; // évite re-render inutile sur notre propre écriture
+
 // ── ÉTAT ──────────────────────────────────────────────
 let recipes        = [];
 let mealPlan       = {};
@@ -64,14 +77,37 @@ let pickerSlot     = null;
 
 // ── PERSISTANCE ───────────────────────────────────────
 function load() {
-  try { recipes    = JSON.parse(localStorage.getItem('mes-recettes')        || '[]'); } catch { recipes = []; }
-  try { mealPlan   = JSON.parse(localStorage.getItem('mes-repas')           || '{}'); } catch { mealPlan = {}; }
-  try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom')|| '[]'); } catch { customCats = []; }
+  // 1) Affichage immédiat depuis le cache local
+  try { recipes    = JSON.parse(localStorage.getItem('mes-recettes')         || '[]'); } catch { recipes = []; }
+  try { mealPlan   = JSON.parse(localStorage.getItem('mes-repas')            || '{}'); } catch { mealPlan = {}; }
+  try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
+
+  // 2) Synchronisation temps réel via Firebase
+  STORE.onSnapshot(snap => {
+    if (_ownWrite) { _ownWrite = false; return; } // ignorer nos propres écritures
+    if (!snap.exists) return;
+    const d   = snap.data();
+    recipes    = d.recipes    || [];
+    mealPlan   = d.mealPlan   || {};
+    customCats = d.customCats || [];
+    // Mettre à jour le cache local
+    localStorage.setItem('mes-recettes',          JSON.stringify(recipes));
+    localStorage.setItem('mes-repas',             JSON.stringify(mealPlan));
+    localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
+    // Re-rendre l'interface
+    renderSidebar(); renderTagCloud(); renderCatSelect(); render();
+  }, err => console.warn('Firebase sync:', err));
 }
+
 function save() {
-  localStorage.setItem('mes-recettes',         JSON.stringify(recipes));
-  localStorage.setItem('mes-repas',            JSON.stringify(mealPlan));
-  localStorage.setItem('mes-categories-custom',JSON.stringify(customCats));
+  // Cache local immédiat
+  localStorage.setItem('mes-recettes',          JSON.stringify(recipes));
+  localStorage.setItem('mes-repas',             JSON.stringify(mealPlan));
+  localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
+  // Sauvegarde Firebase (async, fire & forget)
+  _ownWrite = true;
+  STORE.set({ recipes, mealPlan, customCats })
+    .catch(e => { _ownWrite = false; console.warn('Firebase save:', e); });
 }
 
 // ── CATÉGORIES ────────────────────────────────────────
@@ -121,6 +157,17 @@ function renderSidebar() {
     li.className = 'filter-item' + (activeCat === c.id ? ' active' : '');
     li.dataset.cat = c.id;
     li.innerHTML = `<span>${c.emoji}</span><span class="fi-name">${esc(c.label)}</span><span class="fi-count">${count}</span>`;
+    // Drag depuis la sidebar
+    if (c.id !== 'all') {
+      li.draggable = true;
+      li.title = `Glisser sur une recette pour changer sa catégorie`;
+      li.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('drop-cat-id', c.id);
+        e.dataTransfer.effectAllowed = 'copy';
+        li.classList.add('dragging-cat');
+      });
+      li.addEventListener('dragend', () => li.classList.remove('dragging-cat'));
+    }
     list.appendChild(li);
   });
 
@@ -258,26 +305,52 @@ const CORS_PROXY = 'https://api.allorigins.win/get?url=';
 const _photoCache = {}; // recipeId → url (in-memory only)
 
 async function doUrlImport() {
-  const url   = document.getElementById('import-url-input').value.trim();
+  const raw    = document.getElementById('import-url-input').value.trim();
   const status = document.getElementById('url-import-status');
-  if (!url) { status.innerHTML = '<div class="import-error">Collez une URL valide.</div>'; return; }
+  if (!raw) { status.innerHTML = '<div class="import-error">Collez au moins une URL.</div>'; return; }
+
+  const urls = raw.split('\n').map(u => u.trim()).filter(u => u.startsWith('http'));
+  if (!urls.length) { status.innerHTML = '<div class="import-error">Aucune URL valide détectée.</div>'; return; }
 
   const btn = document.getElementById('import-url-btn');
   btn.disabled = true;
-  status.innerHTML = '<div class="url-import-loading"><span class="spinner"></span>Récupération de la page en cours…</div>';
 
-  try {
-    const recipe = await importFromUrl(url);
-    status.innerHTML = `<div class="url-import-success">✓ Recette extraite : <strong>${esc(recipe.name || 'Sans titre')}</strong>. Vérifiez et complétez ci-dessous.</div>`;
-    setTimeout(() => {
-      closeModal('ov-import');
-      openAddWithData(recipe);
-    }, 900);
-  } catch(e) {
-    status.innerHTML = `<div class="import-error">${esc(e.message)}</div>`;
-  } finally {
-    btn.disabled = false;
+  // Une seule URL → ouvre le formulaire pour vérification
+  if (urls.length === 1) {
+    status.innerHTML = '<div class="url-import-loading"><span class="spinner"></span>Récupération en cours…</div>';
+    try {
+      const recipe = await importFromUrl(urls[0]);
+      status.innerHTML = `<div class="url-import-success">✓ Recette extraite : <strong>${esc(recipe.name || 'Sans titre')}</strong></div>`;
+      setTimeout(() => { closeModal('ov-import'); openAddWithData(recipe); }, 900);
+    } catch(e) {
+      status.innerHTML = `<div class="import-error">${esc(e.message)}</div>`;
+    } finally { btn.disabled = false; }
+    return;
   }
+
+  // Plusieurs URLs → import en masse direct (sans ouvrir le formulaire)
+  let ok = 0, fail = 0;
+  for (let i = 0; i < urls.length; i++) {
+    status.innerHTML = `<div class="url-import-loading"><span class="spinner"></span>Import ${i + 1} / ${urls.length}…</div>`;
+    try {
+      const recipe = await importFromUrl(urls[i]);
+      recipe.id = 'r' + Date.now() + Math.random().toString(36).slice(2);
+      recipes.push(recipe);
+      save();
+      ok++;
+    } catch(e) {
+      fail++;
+    }
+    // Petite pause pour ne pas surcharger le proxy
+    if (i < urls.length - 1) await new Promise(r => setTimeout(r, 600));
+  }
+
+  render(); renderSidebar(); renderTagCloud();
+  const msg = `✓ ${ok} recette${ok > 1 ? 's' : ''} importée${ok > 1 ? 's' : ''}${fail ? ` · ${fail} échec${fail > 1 ? 's' : ''}` : ''}`;
+  status.innerHTML = `<div class="url-import-success">${msg}</div>`;
+  toast(msg);
+  btn.disabled = false;
+  document.getElementById('import-url-input').value = '';
 }
 
 async function importFromUrl(url) {
@@ -624,6 +697,30 @@ function makeCard(r) {
     </div>`;
 
   div.addEventListener('click', () => openDetail(r.id));
+
+  // Drop d'une catégorie sur la carte
+  div.addEventListener('dragover', e => {
+    if ([...e.dataTransfer.types].includes('drop-cat-id')) {
+      e.preventDefault();
+      div.classList.add('card-drop-target');
+    }
+  });
+  div.addEventListener('dragleave', e => {
+    if (!div.contains(e.relatedTarget)) div.classList.remove('card-drop-target');
+  });
+  div.addEventListener('drop', e => {
+    e.preventDefault();
+    div.classList.remove('card-drop-target');
+    const catId = e.dataTransfer.getData('drop-cat-id');
+    if (!catId) return;
+    const rec = recipes.find(x => x.id === r.id);
+    if (rec && rec.category !== catId) {
+      rec.category = catId;
+      save(); render(); renderSidebar();
+      const label = allCats()[catId]?.label || catId;
+      toast(`Catégorie → ${label}`);
+    }
+  });
 
   // Async: replace SVG placeholder with real photo
   if (!r.photo && !_photoCache[r.id]) {

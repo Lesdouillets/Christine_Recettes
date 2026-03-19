@@ -348,12 +348,12 @@
 
       <div id="import-tab-url">
         <div class="url-import-wrap">
-          <p class="url-import-desc">Collez l'URL d'une recette pour l'importer automatiquement avec sa photo.</p>
-          <div class="url-import-row">
-            <input type="text" id="import-url-input" placeholder="https://www.healthyfoodcreation.fr/… ou lien Instagram / TikTok">
-            <button class="btn btn-primary" id="import-url-btn" onclick="doUrlImport()">Extraire</button>
-          </div>
-          <p class="url-import-hint">✓ Sites de recettes (JSON-LD)  ·  ✓ Instagram (photo + légende)  ·  ✓ TikTok</p>
+          <p class="url-import-desc">Collez une ou plusieurs URLs (une par ligne) pour les importer automatiquement avec leurs photos.</p>
+          <textarea id="import-url-input" rows="4" placeholder="https://www.healthyfoodcreation.fr/recette-1/
+https://www.healthyfoodcreation.fr/recette-2/
+https://www.instagram.com/p/…"></textarea>
+          <button class="btn btn-primary" id="import-url-btn" onclick="doUrlImport()">Importer</button>
+          <p class="url-import-hint">✓ Sites de recettes (JSON-LD)  ·  ✓ Instagram (photo + légende)  ·  ✓ TikTok  ·  ✓ Import en masse</p>
         </div>
         <div id="url-import-status"></div>
       </div>
@@ -432,6 +432,8 @@
 
 
 <div id="toasts"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
