@@ -93,7 +93,7 @@ function load() {
       if (recipes.length > 0) {
         toast('Synchronisation vers le cloud en cours…', 'info');
         _ownWrite = true;
-        STORE.set({ recipes, mealPlan, customCats })
+        STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
           .then(() => toast(`✓ ${recipes.length} recettes synchronisées sur tous vos appareils`))
           .catch(() => { _ownWrite = false; });
       }
@@ -108,7 +108,7 @@ function load() {
     // Si localStorage a plus de vraies recettes que Firebase → priorité au local (migration)
     if (lcCount > fbCount) {
       _ownWrite = true;
-      STORE.set({ recipes, mealPlan, customCats })
+      STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
         .then(() => toast(`✓ ${lcCount} recettes synchronisées`))
         .catch(() => { _ownWrite = false; });
       return;
@@ -126,14 +126,25 @@ function load() {
   }, err => console.warn('Firebase sync:', err));
 }
 
+// Supprime les photos base64 avant envoi Firebase (trop volumineuses, restent en local)
+function stripForCloud(arr) {
+  return arr.map(r => {
+    if (r.photo && r.photo.startsWith('data:')) {
+      const { photo, ...rest } = r;
+      return rest;
+    }
+    return r;
+  });
+}
+
 function save() {
-  // Cache local immédiat
+  // Cache local immédiat (avec photos base64)
   localStorage.setItem('mes-recettes',          JSON.stringify(recipes));
   localStorage.setItem('mes-repas',             JSON.stringify(mealPlan));
   localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
-  // Sauvegarde Firebase (async, fire & forget)
+  // Sauvegarde Firebase (sans photos base64 — limite 1Mo)
   _ownWrite = true;
-  STORE.set({ recipes, mealPlan, customCats })
+  STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
     .catch(e => { _ownWrite = false; console.warn('Firebase save:', e); });
 }
 
@@ -1801,7 +1812,7 @@ function forceSyncToCloud() {
   if (!confirm(`Envoyer ${real.length} recettes vers Firebase ?\n\nCela remplacera les données existantes sur tous vos appareils.`)) return;
 
   toast(`Envoi de ${real.length} recettes…`, 'info');
-  STORE.set({ recipes: real, mealPlan, customCats })
+  STORE.set({ recipes: stripForCloud(real), mealPlan, customCats })
     .then(() => {
       recipes = real;
       localStorage.setItem('mes-recettes', JSON.stringify(real));
