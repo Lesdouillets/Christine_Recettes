@@ -542,6 +542,14 @@ async function doUrlImport() {
     status.innerHTML = '<div class="url-import-loading"><span class="spinner"></span>Récupération en cours…</div>';
     try {
       const recipe = applyDefaults(await importFromUrl(urls[0]));
+      // Vérification doublon URL unique
+      const dup = findDuplicate(recipe.name || '', urls[0], recipe.id);
+      if (dup) {
+        status.innerHTML = `<div class="import-error">⚠️ Cette recette semble déjà importée : « ${esc(dup.recipe.name)} ».<br>
+          <button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="(()=>{ closeModal('ov-import'); openAddWithData(${JSON.stringify(recipe).replace(/</g,'\\u003c')}); })()">Importer quand même</button></div>`;
+        btn.disabled = false;
+        return;
+      }
       status.innerHTML = `<div class="url-import-success">✓ Recette extraite : <strong>${esc(recipe.name || 'Sans titre')}</strong></div>`;
       setTimeout(() => { closeModal('ov-import'); openAddWithData(recipe); }, 900);
     } catch(e) {
@@ -551,12 +559,15 @@ async function doUrlImport() {
   }
 
   // Plusieurs URLs → import en masse direct
-  let ok = 0, fail = 0;
+  let ok = 0, fail = 0, skipped = 0;
   for (let i = 0; i < urls.length; i++) {
     status.innerHTML = `<div class="url-import-loading"><span class="spinner"></span>Import ${i + 1} / ${urls.length}…</div>`;
     try {
       const recipe = applyDefaults(await importFromUrl(urls[i]));
       recipe.id = 'r' + Date.now() + Math.random().toString(36).slice(2);
+      // Vérification doublon en masse (par URL source)
+      const dup = findDuplicate(recipe.name || '', urls[i], recipe.id);
+      if (dup) { skipped++; continue; }
       recipes.push(recipe);
       save();
       ok++;
@@ -567,7 +578,9 @@ async function doUrlImport() {
   }
 
   render(); renderSidebar(); renderTagCloud();
-  const msg = `✓ ${ok} recette${ok > 1 ? 's' : ''} importée${ok > 1 ? 's' : ''}${fail ? ` · ${fail} échec${fail > 1 ? 's' : ''}` : ''}`;
+  const msg = `✓ ${ok} recette${ok > 1 ? 's' : ''} importée${ok > 1 ? 's' : ''}` +
+    (skipped ? ` · ${skipped} doublon${skipped > 1 ? 's' : ''} ignoré${skipped > 1 ? 's' : ''}` : '') +
+    (fail    ? ` · ${fail} échec${fail > 1 ? 's' : ''}` : '');
   status.innerHTML = `<div class="url-import-success">${msg}</div>`;
   toast(msg);
   btn.disabled = false;
@@ -1238,6 +1251,22 @@ function gatherIngredients() {
   })).filter(i => i.name);
 }
 
+// ── DÉTECTION DOUBLONS ────────────────────────────────
+function findDuplicate(name, sourceUrl, excludeId) {
+  const norm = name.trim().toLowerCase().replace(/\s+/g, ' ');
+  // Par nom exact (insensible à la casse)
+  const byName = recipes.find(r => r.id !== excludeId &&
+    r.name.trim().toLowerCase().replace(/\s+/g, ' ') === norm);
+  if (byName) return { recipe: byName, reason: 'name' };
+  // Par URL source
+  if (sourceUrl) {
+    const byUrl = recipes.find(r => r.id !== excludeId &&
+      r.source?.ref && r.source.ref.trim() === sourceUrl.trim());
+    if (byUrl) return { recipe: byUrl, reason: 'url' };
+  }
+  return null;
+}
+
 function saveRecipe() {
   const name = document.getElementById('f-name').value.trim();
   const cat  = document.getElementById('f-cat').value;
@@ -1279,6 +1308,17 @@ function saveRecipe() {
     notes:        document.getElementById('f-notes').value.trim(),
     dateAdded:    idx >= 0 ? recipes[idx].dateAdded : new Date().toISOString(),
   };
+
+  // Vérification doublon uniquement pour les nouvelles recettes
+  if (idx < 0) {
+    const dup = findDuplicate(name, recipe.source.ref, id);
+    if (dup) {
+      const msg = dup.reason === 'url'
+        ? `⚠️ Une recette avec cette même URL existe déjà :\n« ${dup.recipe.name} »\n\nAjouter quand même ?`
+        : `⚠️ Une recette avec ce nom existe déjà :\n« ${dup.recipe.name} »\n\nAjouter quand même ?`;
+      if (!confirm(msg)) return;
+    }
+  }
 
   if (idx >= 0) { recipes[idx] = recipe; toast('Recette mise à jour ✓'); }
   else          { recipes.unshift(recipe); toast('Recette ajoutée ✓'); }
