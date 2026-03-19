@@ -1522,8 +1522,6 @@ function openImport() {
   document.getElementById('import-text-input').value     = '';
   document.getElementById('text-import-status').innerHTML = '';
   document.getElementById('file-drop-zone').classList.remove('has-file');
-  const jBtn = document.getElementById('json-import-btn');
-  if (jBtn) { jBtn.disabled = true; jBtn.style.opacity = '.45'; jBtn.style.cursor = 'default'; jBtn.textContent = 'Choisissez un fichier…'; }
   // Reset to URL tab
   document.querySelectorAll('.import-tab').forEach(b => b.classList.remove('active'));
   document.querySelector('.import-tab[data-tab="url"]').classList.add('active');
@@ -1566,9 +1564,7 @@ function handleImportFile(file) {
     document.getElementById('fdz-filename').textContent = `✓ ${file.name} (${Math.round(file.size / 1024)} Ko)`;
     document.getElementById('file-drop-zone').classList.add('has-file');
     document.getElementById('import-error').textContent = '';
-    // Activer le bouton importer
-    const btn = document.getElementById('json-import-btn');
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = ''; btn.textContent = `Importer ${file.name}`; }
+    toast(`Fichier prêt — cliquez sur "Importer le fichier JSON"`);
   };
   reader.readAsText(file);
 }
