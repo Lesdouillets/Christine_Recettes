@@ -351,9 +351,10 @@
     </div>
     <div class="modal-body">
       <div class="import-tabs">
-        <button class="import-tab active" data-tab="url">🔗 Depuis une URL</button>
-        <button class="import-tab" data-tab="file">📂 Fichier JSON</button>
-        <button class="import-tab" data-tab="text">📋 Coller du texte</button>
+        <button class="import-tab active" data-tab="url">🔗 URL</button>
+        <button class="import-tab" data-tab="text">📋 Texte</button>
+        <button class="import-tab" data-tab="todo">📌 À importer</button>
+        <button class="import-tab" data-tab="file">📂 JSON</button>
       </div>
 
       <div id="import-tab-url">
@@ -394,10 +395,9 @@ https://www.instagram.com/p/…"></textarea>
       </div>
       <div id="import-tab-text" style="display:none">
         <div class="text-import-wrap">
-          <p class="url-import-desc">Copiez-collez le texte complet d'une recette (ingrédients + préparation). Les ingrédients seront extraits automatiquement.</p>
+          <p class="url-import-desc">Collez le texte : <strong>1ère ligne</strong> = titre, puis <strong>ligne vide</strong>, puis les ingrédients (un par ligne), puis <strong>ligne vide</strong>, puis la préparation. Les tirets en début de ligne sont supprimés automatiquement.</p>
           <textarea id="import-text-input" rows="12" spellcheck="false" placeholder="Pancakes moelleux
 
-Ingrédients :
 200g de farine
 2 œufs
 250ml de lait
@@ -405,17 +405,27 @@ Ingrédients :
 30g de beurre
 1 pincée de sel
 
-Préparation :
-Mélanger la farine, la levure et le sel..."></textarea>
+Mélanger la farine, la levure et le sel dans un saladier.
+Ajouter les œufs et le lait progressivement.
+Faire cuire dans une poêle beurrée 2 min de chaque côté."></textarea>
           <button class="btn btn-primary" id="import-text-btn" onclick="doTextImport()">Extraire et importer</button>
         </div>
         <div id="text-import-status"></div>
       </div>
+      <div id="import-tab-todo" style="display:none">
+        <div class="todo-tab-wrap">
+          <p class="url-import-desc">Enregistrez des URLs à importer plus tard. Revenez quand vous voulez pour les importer une par une.</p>
+          <div class="todo-add-row">
+            <textarea id="todo-url-input" rows="2" placeholder="https://www.marmiton.org/recette/…&#10;https://www.750g.com/…" spellcheck="false"></textarea>
+            <button class="btn btn-primary btn-sm" onclick="addToUrlTodo()">+ Ajouter</button>
+          </div>
+          <div id="url-todo-list"></div>
+        </div>
+      </div>
       <div class="import-error" id="import-error"></div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="closeModal('ov-import')">Annuler</button>
-      <button class="btn btn-primary" onclick="doImport()">Importer</button>
+      <button class="btn btn-ghost" onclick="closeModal('ov-import')">Fermer</button>
     </div>
   </div>
 </div>
@@ -451,7 +461,10 @@ Mélanger la farine, la levure et le sel..."></textarea>
         <div class="form-3col">
           <div class="form-group">
             <label>Emoji</label>
-            <input type="text" id="new-cat-emoji" placeholder="🍲" maxlength="4">
+            <div class="emoji-input-wrap">
+              <input type="text" id="new-cat-emoji" placeholder="🍲" maxlength="4" readonly>
+              <button type="button" id="emoji-picker-btn" class="btn-emoji-pick" onclick="toggleEmojiPicker()" title="Choisir un emoji">🔍</button>
+            </div>
           </div>
           <div class="form-group" style="grid-column:span 2">
             <label>Nom</label>

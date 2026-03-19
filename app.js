@@ -64,6 +64,7 @@ let _ownWrite = false; // évite re-render inutile sur notre propre écriture
 let recipes        = [];
 let mealPlan       = {};
 let customCats     = [];   // [{ id, label, emoji }]
+let urlTodo        = [];   // [{ url, addedAt }] — URLs à importer plus tard
 
 let activeCat      = 'all';
 let activeTag      = null;
@@ -81,6 +82,7 @@ function load() {
   try { recipes    = JSON.parse(localStorage.getItem('mes-recettes')         || '[]'); } catch { recipes = []; }
   try { mealPlan   = JSON.parse(localStorage.getItem('mes-repas')            || '{}'); } catch { mealPlan = {}; }
   try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
+  try { urlTodo    = JSON.parse(localStorage.getItem('mes-urls-todo')         || '[]'); } catch { urlTodo = []; }
 
   // 2) Synchronisation temps réel via Firebase
   STORE.onSnapshot(snap => {
@@ -281,6 +283,48 @@ function deleteCustomCategory(id) {
   toast('Catégorie supprimée', 'info');
 }
 
+// ── EMOJI PICKER ──────────────────────────────────────
+const FOOD_EMOJIS = [
+  '🍕','🍔','🌮','🌯','🥗','🍜','🍝','🍲','🥘','🍛',
+  '🍣','🍱','🍙','🍚','🥩','🍗','🍖','🥚','🧀','🥞',
+  '🥓','🥦','🥕','🧅','🌽','🍅','🥑','🍆','🥔','🍠',
+  '🥜','🍞','🥐','🥖','🫓','🥨','🥯','🧆','🥙','🌭',
+  '🍰','🎂','🧁','🍩','🍪','🍫','🍮','🍯','🧇','🧈',
+  '🍦','🍧','🍨','🥧','🍡','🍋','🍊','🍇','🍓','🫐',
+  '🍒','🍑','🥭','🍍','🥥','🍌','🍎','🍐','🍈','🫒',
+  '🦞','🦐','🦑','🦀','🐟','☕','🫖','🍵','🥂','🍷',
+  '🫕','🥗','🍤','🌶️','🧄','🫚','🧂','🫙','🍶','🥛',
+];
+
+function toggleEmojiPicker() {
+  let picker = document.getElementById('emoji-picker-grid');
+  if (picker) { picker.remove(); return; }
+
+  picker = document.createElement('div');
+  picker.id = 'emoji-picker-grid';
+  picker.className = 'emoji-picker-grid';
+  picker.innerHTML = FOOD_EMOJIS.map(e =>
+    `<button type="button" class="emoji-pick-btn" onclick="pickEmoji('${e}')">${e}</button>`
+  ).join('');
+
+  const btn = document.getElementById('emoji-picker-btn');
+  btn.parentNode.insertBefore(picker, btn.nextSibling);
+
+  // Fermer si clic ailleurs
+  setTimeout(() => document.addEventListener('click', function closePicker(ev) {
+    if (!picker.contains(ev.target) && ev.target.id !== 'emoji-picker-btn') {
+      picker.remove();
+      document.removeEventListener('click', closePicker);
+    }
+  }), 0);
+}
+
+function pickEmoji(e) {
+  document.getElementById('new-cat-emoji').value = e;
+  const picker = document.getElementById('emoji-picker-grid');
+  if (picker) picker.remove();
+}
+
 // ── UTILS ─────────────────────────────────────────────
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
@@ -340,6 +384,75 @@ function toast(msg, type = 'success') {
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
+// ── URL TODO LIST ─────────────────────────────────────
+function saveUrlTodo() {
+  localStorage.setItem('mes-urls-todo', JSON.stringify(urlTodo));
+}
+
+function addToUrlTodo() {
+  const input = document.getElementById('todo-url-input');
+  const raw = input.value.trim();
+  if (!raw) return;
+  const urls = raw.split('\n').map(u => u.trim()).filter(u => u.startsWith('http'));
+  if (!urls.length) { toast('Aucune URL valide détectée.', 'error'); return; }
+  let added = 0;
+  urls.forEach(url => {
+    if (!urlTodo.find(t => t.url === url)) {
+      urlTodo.push({ url, addedAt: new Date().toISOString() });
+      added++;
+    }
+  });
+  saveUrlTodo();
+  input.value = '';
+  renderUrlTodo();
+  toast(`${added} URL${added > 1 ? 's' : ''} ajoutée${added > 1 ? 's' : ''} à la liste`);
+}
+
+function removeFromUrlTodo(url) {
+  urlTodo = urlTodo.filter(t => t.url !== url);
+  saveUrlTodo();
+  renderUrlTodo();
+}
+
+async function importFromUrlTodo(url) {
+  const btn = document.querySelector(`[data-todo-url="${CSS.escape(url)}"] .todo-import-btn`);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    const recipe = await importFromUrl(url);
+    removeFromUrlTodo(url);
+    closeModal('ov-import');
+    openAddWithData(recipe);
+    toast('Recette prête à enregistrer');
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Importer'; }
+    toast('Erreur : ' + e.message, 'error');
+  }
+}
+
+function renderUrlTodo() {
+  const el = document.getElementById('url-todo-list');
+  if (!el) return;
+  if (!urlTodo.length) {
+    el.innerHTML = '<p class="todo-empty">Aucune URL enregistrée. Collez des URLs ci-dessus pour les importer plus tard.</p>';
+    return;
+  }
+  el.innerHTML = urlTodo.map((t, i) => {
+    const domain = (() => { try { return new URL(t.url).hostname.replace('www.',''); } catch { return t.url.slice(0,40); } })();
+    const date = new Date(t.addedAt).toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
+    return `<div class="todo-item" data-todo-url="${esc(t.url)}">
+      <div class="todo-item-info">
+        <span class="todo-domain">${esc(domain)}</span>
+        <span class="todo-date">${date}</span>
+        <a href="${esc(t.url)}" target="_blank" class="todo-link" title="Voir la page">↗</a>
+      </div>
+      <div class="todo-item-actions">
+        <button class="btn btn-primary btn-xs todo-import-btn" onclick="importFromUrlTodo('${esc(t.url)}')">Importer</button>
+        <button class="btn btn-ghost btn-xs" onclick="removeFromUrlTodo('${esc(t.url)}')" title="Supprimer">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 // ── URL IMPORT ────────────────────────────────────────
 const CORS_PROXY = 'https://api.allorigins.win/get?url=';
 const _photoCache = {}; // recipeId → url (in-memory only)
@@ -350,40 +463,51 @@ function doTextImport() {
   const status = document.getElementById('text-import-status');
   if (!raw) { status.innerHTML = '<div class="import-error">Collez d\'abord le texte d\'une recette.</div>'; return; }
 
-  const lines = raw.split('\n').map(l => l.trim());
+  // Nettoyer les tirets/puces en début de ligne
+  const cleanRaw = raw.split('\n').map(l => l.replace(/^[-–—•·*✓✗]\s*/, '')).join('\n');
 
-  // 1. Nom de la recette = première ligne non vide
-  const name = lines.find(l => l.length > 2 && l.length < 120) || 'Recette importée';
+  // Découper par paragraphes (lignes vides)
+  const paragraphs = cleanRaw.split(/\n[ \t]*\n/).map(p => p.trim()).filter(p => p.length > 0);
 
-  // 2. Trouver les sections ingrédients / préparation
   const ING_KW  = /^(ingrédients?|ingredients?|il vous faut|pour (cette|la) recette|pour \d)/i;
   const PREP_KW = /^(préparation|preparation|instructions?|étapes?|recette|méthode|réalisation|déroulé)/i;
 
-  let ingStart = -1, ingEnd = lines.length, prepStart = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (ingStart === -1 && ING_KW.test(lines[i])) { ingStart = i + 1; continue; }
-    if (ingStart !== -1 && prepStart === -1 && PREP_KW.test(lines[i])) { ingEnd = i; prepStart = i + 1; break; }
+  let name = '', ingLines = [], prepText = '';
+
+  if (paragraphs.length >= 2 && !ING_KW.test(paragraphs[0]) && !ING_KW.test(paragraphs[1].split('\n')[0])) {
+    // ── Nouveau format : titre / ingrédients / préparation ──
+    name     = paragraphs[0].split('\n')[0].trim();
+    ingLines = paragraphs[1].split('\n').map(l => l.trim()).filter(l => l.length > 1);
+    prepText = paragraphs.slice(2).join('\n\n').trim();
+  } else {
+    // ── Ancien format avec mots-clés ──
+    const lines = cleanRaw.split('\n').map(l => l.trim());
+    name = lines.find(l => l.length > 2 && l.length < 120 && !ING_KW.test(l)) || 'Recette importée';
+
+    let ingStart = -1, ingEnd = lines.length, prepStart = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (ingStart === -1 && ING_KW.test(lines[i]))  { ingStart = i + 1; continue; }
+      if (ingStart !== -1 && PREP_KW.test(lines[i])) { ingEnd = i; prepStart = i + 1; break; }
+    }
+    ingLines = (ingStart !== -1
+      ? lines.slice(ingStart, ingEnd)
+      : lines.filter(l => /^\d|^[½⅓⅔¼¾]|\b\d+\s*(g|ml|cl|l|kg|cs|cc|cuillère|tasse|sachet|pincée)\b/i.test(l))
+    ).filter(l => l.length > 1);
+    prepText = prepStart !== -1 ? lines.slice(prepStart).filter(l => !PREP_KW.test(l)).join('\n').trim() : '';
   }
 
-  // 3. Extraire les ingrédients
-  let ingLines = ingStart !== -1
-    ? lines.slice(ingStart, ingEnd).filter(l => l)
-    : lines.filter(l => /^\d|^[½⅓⅔¼¾]|\b\d+\s*(g|ml|cl|l|kg|c\.s|c\.c|cs|cc|cuillère|tasse|sachet|pincée|botte)\b/i.test(l));
-
+  name = name || 'Recette importée';
   const ingredients = ingLines.map(l => parseIngredientString(l)).filter(i => i.name && i.name.length > 1);
 
-  // 4. Notes = section préparation
-  const notes = prepStart !== -1 ? lines.slice(prepStart).join('\n').trim() : '';
-
   if (!ingredients.length) {
-    status.innerHTML = '<div class="import-error">Aucun ingrédient détecté. Assurez-vous que le texte contient une section "Ingrédients".</div>';
+    status.innerHTML = '<div class="import-error">Aucun ingrédient détecté. Séparez le titre, les ingrédients et la préparation par des <strong>lignes vides</strong>.</div>';
     return;
   }
 
-  status.innerHTML = `<div class="url-import-success">✓ ${ingredients.length} ingrédients extraits. Vérifiez et complétez ci-dessous.</div>`;
+  status.innerHTML = `<div class="url-import-success">✓ ${ingredients.length} ingrédients extraits — « ${esc(name)} »</div>`;
   setTimeout(() => {
     closeModal('ov-import');
-    openAddWithData({ name, ingredients, notes });
+    openAddWithData({ name, ingredients, instructions: prepText });
     document.getElementById('import-text-input').value = '';
     status.innerHTML = '';
   }, 800);
@@ -1117,8 +1241,17 @@ function gatherIngredients() {
 function saveRecipe() {
   const name = document.getElementById('f-name').value.trim();
   const cat  = document.getElementById('f-cat').value;
-  if (!name) { toast('Le nom est requis.', 'error'); return; }
-  if (!cat)  { toast('Choisissez une catégorie.', 'error'); return; }
+  if (!name) { toast('Le nom est requis.', 'error'); document.getElementById('f-name').focus(); return; }
+  if (!cat)  {
+    toast('Choisissez une catégorie.', 'error');
+    const sel = document.getElementById('f-cat');
+    sel.focus();
+    sel.style.borderColor = '#ef4444';
+    sel.style.boxShadow = '0 0 0 3px #fee2e2';
+    setTimeout(() => { sel.style.borderColor = ''; sel.style.boxShadow = ''; }, 2500);
+    sel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
 
   const id  = document.getElementById('f-id').value || uid();
   const idx = recipes.findIndex(r => r.id === id);
@@ -1355,7 +1488,9 @@ function openImport() {
   document.getElementById('import-tab-url').style.display  = '';
   document.getElementById('import-tab-file').style.display = 'none';
   document.getElementById('import-tab-text').style.display = 'none';
+  document.getElementById('import-tab-todo').style.display = 'none';
   importFileContent = null;
+  renderUrlTodo();
   openModal('ov-import');
 }
 function initImportTabs() {
@@ -1367,6 +1502,8 @@ function initImportTabs() {
       document.getElementById('import-tab-url').style.display  = tab === 'url'  ? '' : 'none';
       document.getElementById('import-tab-file').style.display = tab === 'file' ? '' : 'none';
       document.getElementById('import-tab-text').style.display = tab === 'text' ? '' : 'none';
+      document.getElementById('import-tab-todo').style.display = tab === 'todo' ? '' : 'none';
+      if (tab === 'todo') renderUrlTodo();
     });
   });
   const fileInput = document.getElementById('import-file-input');
