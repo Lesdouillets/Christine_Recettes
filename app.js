@@ -114,7 +114,11 @@ function load() {
       return;
     }
 
-    recipes    = d.recipes    || [];
+    // Conserver les photos locales (base64) que Firebase ne stocke pas
+    const localPhotos = {};
+    recipes.forEach(r => { if (r.photo && r.photo.startsWith('data:')) localPhotos[r.id] = r.photo; });
+    const fbRecs = d.recipes || [];
+    recipes    = fbRecs.map(r => localPhotos[r.id] ? {...r, photo: localPhotos[r.id]} : r);
     mealPlan   = d.mealPlan   || {};
     customCats = d.customCats || [];
     // Mettre à jour le cache local
@@ -1834,7 +1838,10 @@ function forceLoadFromCloud() {
     const fbRecipes = d.recipes || [];
     if (!fbRecipes.length) { toast('Firebase est vide', 'error'); return; }
     if (!confirm(`Charger ${fbRecipes.length} recettes depuis Firebase ?\n\nVos recettes locales (${recipes.length}) seront remplacées.`)) return;
-    recipes = fbRecipes;
+    // Conserver les photos locales (base64) que Firebase ne stocke pas
+    const localPhotoMap = {};
+    recipes.forEach(r => { if (r.photo && r.photo.startsWith('data:')) localPhotoMap[r.id] = r.photo; });
+    recipes = fbRecipes.map(r => localPhotoMap[r.id] ? {...r, photo: localPhotoMap[r.id]} : r);
     mealPlan = d.mealPlan || {};
     customCats = d.customCats || [];
     localStorage.setItem('mes-recettes', JSON.stringify(recipes));
