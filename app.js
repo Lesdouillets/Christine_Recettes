@@ -1242,11 +1242,12 @@ function generateShoppingList() {
 let importFileContent = null;
 
 function openImport() {
-  document.getElementById('import-json').value        = '';
-  document.getElementById('import-error').textContent = '';
-  document.getElementById('fdz-filename').textContent = '';
-  document.getElementById('import-url-input').value   = '';
+  document.getElementById('import-error').textContent    = '';
+  document.getElementById('fdz-filename').textContent    = '';
+  document.getElementById('import-url-input').value      = '';
   document.getElementById('url-import-status').innerHTML = '';
+  document.getElementById('import-text-input').value     = '';
+  document.getElementById('text-import-status').innerHTML = '';
   document.getElementById('file-drop-zone').classList.remove('has-file');
   // Reset to URL tab
   document.querySelectorAll('.import-tab').forEach(b => b.classList.remove('active'));
