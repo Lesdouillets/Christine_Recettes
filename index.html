@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Mes Recettes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="header">
+  <button class="hamburger" id="sidebar-toggle" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+
+  <div class="header-brand">
+    <div class="brand-logo">
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="14" cy="14" r="14" fill="#3B82F6"/>
+        <path d="M8 10c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v2H8v-2z" fill="white" opacity=".9"/>
+        <rect x="8" y="13" width="12" height="1.5" rx=".75" fill="white" opacity=".7"/>
+        <path d="M9 16h10l-1.5 4H10.5L9 16z" fill="white" opacity=".9"/>
+      </svg>
+    </div>
+    <span class="brand-name">Mes Recettes</span>
+  </div>
+
+  <nav class="header-nav">
+    <button class="nav-tab active" data-view="recipes">Recettes</button>
+    <button class="nav-tab" data-view="planner">Planning</button>
+  </nav>
+
+  <div class="header-search">
+    <svg class="search-ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8.5" cy="8.5" r="5.5"/><line x1="13" y1="13" x2="18" y2="18"/></svg>
+    <input type="text" id="search-input" placeholder="Rechercher une recette ou un ingrédient…" autocomplete="off">
+    <button class="search-clear" id="search-clear">✕</button>
+  </div>
+
+  <div class="header-actions">
+    <button class="hbtn hbtn-ghost" id="import-btn" title="Importer des recettes">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 16 12 20 16 16"/><line x1="12" y1="8" x2="12" y2="20"/><path d="M20 12a8 8 0 1 0-16 0"/></svg>
+      <span class="hbtn-label">Importer</span>
+    </button>
+    <button class="hbtn hbtn-ghost" id="export-btn" title="Exporter toutes les recettes">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 4 12 0 16 4"/><line x1="12" y1="0" x2="12" y2="12"/><path d="M20 12v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-6"/></svg>
+      <span class="hbtn-label">Exporter</span>
+    </button>
+    <button class="hbtn hbtn-ghost" id="cart-btn" title="Liste de courses">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/><path d="M1 1h3l2 10h10l2.5-6.5H5"/></svg>
+      <span class="cart-badge" id="cart-badge"></span>
+    </button>
+    <button class="hbtn hbtn-primary" id="add-btn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
+      Recette
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════ APP BODY ═══════════ -->
+<div class="app-body">
+
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-inner">
+
+      <!-- Navigation mobile uniquement -->
+      <section class="sidebar-section sidebar-mobile-nav">
+        <div class="sidebar-section-title">Navigation</div>
+        <ul class="filter-list">
+          <li class="filter-item mobile-nav-item active" data-mobile-view="recipes">
+            <span>🍽️</span><span class="fi-name">Recettes</span>
+          </li>
+          <li class="filter-item mobile-nav-item" data-mobile-view="planner">
+            <span>📅</span><span class="fi-name">Planning</span>
+          </li>
+        </ul>
+        <div class="sidebar-mobile-actions">
+          <button class="sidebar-action-btn" id="mobile-import-btn">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 16 12 20 16 16"/><line x1="12" y1="8" x2="12" y2="20"/><path d="M20 12a8 8 0 1 0-16 0"/></svg>
+            Importer des recettes
+          </button>
+          <button class="sidebar-action-btn" id="mobile-export-btn">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 4 12 0 16 4"/><line x1="12" y1="0" x2="12" y2="12"/><path d="M20 12v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-6"/></svg>
+            Exporter mes recettes
+          </button>
+        </div>
+      </section>
+
+      <section class="sidebar-section">
+        <div class="sidebar-section-title">Catégories</div>
+        <ul class="filter-list" id="cat-list"></ul>
+        <button class="manage-cats-btn" id="manage-cats-btn">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><line x1="8" y1="5" x2="8" y2="11"/><line x1="5" y1="8" x2="11" y2="8"/></svg>
+          Gérer les catégories
+        </button>
+      </section>
+
+      <section class="sidebar-section" id="tags-section" style="display:none">
+        <div class="sidebar-section-title">Tags</div>
+        <div class="tag-cloud" id="tag-cloud"></div>
+      </section>
+
+      <section class="sidebar-section">
+        <div class="sidebar-section-title">Note minimum</div>
+        <div class="rating-filter" id="rating-filter">
+          <button class="rf-btn active" data-min="0">Toutes</button>
+          <button class="rf-btn" data-min="3">★★★+</button>
+          <button class="rf-btn" data-min="4">★★★★+</button>
+          <button class="rf-btn" data-min="5">★★★★★</button>
+        </div>
+      </section>
+
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" id="main">
+
+    <div id="view-recipes">
+      <div class="main-topbar">
+        <h2 id="page-title">Toutes les recettes</h2>
+        <span class="results-info" id="results-info"></span>
+      </div>
+      <div class="recipe-grid" id="grid"></div>
+    </div>
+
+    <div id="view-planner" style="display:none">
+      <div class="planner-topbar">
+        <button class="planner-nav-btn" id="planner-prev">‹</button>
+        <h2 id="planner-week-label"></h2>
+        <button class="planner-nav-btn" id="planner-next">›</button>
+        <button class="btn btn-sm btn-ghost" id="planner-today">Aujourd'hui</button>
+      </div>
+      <div class="planner-scroll">
+        <div class="planner-grid" id="planner-grid"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+
+<!-- ═══════════ MODAL : AJOUT / ÉDITION ═══════════ -->
+<div class="overlay" id="ov-edit">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h2 id="edit-modal-title">Nouvelle recette</h2>
+      <button class="close-btn" onclick="closeModal('ov-edit')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="f-id">
+
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Nom de la recette *</label>
+        <input type="text" id="f-name" placeholder="Ex : Fondant au chocolat">
+      </div>
+
+      <div class="form-2col">
+        <div class="form-group">
+          <label>Catégorie *</label>
+          <select id="f-cat"><option value="">— Choisir —</option></select>
+        </div>
+        <div class="form-group">
+          <label>Note</label>
+          <div class="star-picker" id="f-rating" data-val="0">
+            <span class="sp-star" data-v="1">★</span><span class="sp-star" data-v="2">★</span>
+            <span class="sp-star" data-v="3">★</span><span class="sp-star" data-v="4">★</span>
+            <span class="sp-star" data-v="5">★</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-3col">
+        <div class="form-group">
+          <label>Préparation (min)</label>
+          <input type="number" id="f-preptime" min="0" placeholder="15">
+        </div>
+        <div class="form-group">
+          <label>Cuisson (min)</label>
+          <input type="number" id="f-cooktime" min="0" placeholder="30">
+        </div>
+        <div class="form-group">
+          <label>Portions</label>
+          <input type="number" id="f-portions" min="1" placeholder="4">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Tags <span class="hint">(Entrée pour valider)</span></label>
+        <div class="tag-input-wrap" id="tag-input-wrap">
+          <div class="tag-chips" id="tag-chips"></div>
+          <input type="text" id="f-tag-input" placeholder="rapide, sans gluten, batch cooking…">
+        </div>
+      </div>
+
+      <div class="form-2col">
+        <div class="form-group">
+          <label>URL de la photo</label>
+          <input type="text" id="f-photo-url" placeholder="https://…">
+        </div>
+        <div class="form-group">
+          <label>Uploader une photo</label>
+          <input type="file" id="f-photo-file" accept="image/*">
+        </div>
+      </div>
+      <div id="photo-preview-wrap" style="display:none;margin-bottom:14px">
+        <img id="photo-preview" src="" alt="Aperçu" style="max-height:130px;border-radius:8px;border:1px solid var(--border)">
+      </div>
+
+      <div class="form-2col">
+        <div class="form-group">
+          <label>Type de source</label>
+          <select id="f-source-type">
+            <option value="url">🌐 Site internet</option>
+            <option value="instagram">📱 Instagram</option>
+            <option value="livre">📖 Livre</option>
+            <option value="autre">✏️ Autre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Référence (URL, nom du livre…)</label>
+          <input type="text" id="f-source-ref" placeholder="https://… ou titre du livre">
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="section-header">
+          <span class="section-label">Ingrédients</span>
+          <button type="button" class="btn btn-sm btn-outline" onclick="addIngRow()">+ Ajouter</button>
+        </div>
+        <div class="ing-header">
+          <span>Qté</span><span>Unité</span><span>Ingrédient</span><span>Rayon</span><span></span>
+        </div>
+        <div id="ing-rows"></div>
+      </div>
+
+      <div class="form-section">
+        <div class="section-label">Préparation</div>
+        <textarea id="f-instructions" rows="5" placeholder="Étapes de préparation…"></textarea>
+      </div>
+
+      <div class="form-section">
+        <div class="section-label">Notes personnelles</div>
+        <textarea id="f-notes" rows="3" placeholder="Astuces, avis, variantes…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger-ghost" id="edit-del-btn" onclick="deleteCurrentRecipe()" style="display:none">Supprimer</button>
+      <div class="foot-r">
+        <button class="btn btn-ghost" onclick="closeModal('ov-edit')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveRecipe()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ MODAL : DÉTAIL ═══════════ -->
+<div class="overlay" id="ov-detail">
+  <div class="modal modal-xl">
+    <div class="detail-photo-header" id="d-photo-header">
+      <div class="detail-photo-overlay">
+        <div class="detail-photo-actions">
+          <button class="btn btn-sm btn-glass" id="d-cart-btn" onclick="toggleCart()">Ajouter à la liste</button>
+          <button class="btn btn-sm btn-glass" onclick="editDetailRecipe()">Modifier</button>
+          <button class="close-btn close-glass" onclick="closeModal('ov-detail')">✕</button>
+        </div>
+        <div class="detail-photo-title">
+          <span class="cat-pill" id="d-cat-pill"></span>
+          <h2 id="d-name"></h2>
+          <div class="detail-stars" id="d-stars"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="detail-meta-row">
+        <span class="dmeta" id="d-source"></span>
+        <span class="dmeta" id="d-times"></span>
+        <span class="dmeta" id="d-portions"></span>
+        <div class="detail-tags" id="d-tags"></div>
+      </div>
+      <div class="detail-body">
+        <div class="detail-ings-col">
+          <h3>Ingrédients</h3>
+          <ul id="d-ing-list"></ul>
+        </div>
+        <div class="detail-instruct-col">
+          <h3>Préparation</h3>
+          <div id="d-instructions"></div>
+        </div>
+      </div>
+      <div id="d-notes-section" class="detail-notes">
+        <h3>Notes</h3>
+        <p id="d-notes"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ MODAL : LISTE DE COURSES ═══════════ -->
+<div class="overlay" id="ov-shop">
+  <div class="modal modal-wide">
+    <div class="modal-head">
+      <h2>Liste de courses</h2>
+      <button class="close-btn" onclick="closeModal('ov-shop')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="shop-step-1">
+        <p class="shop-hint">Sélectionnez les recettes à inclure :</p>
+        <div id="shop-picker"></div>
+      </div>
+      <div id="shop-step-2" style="display:none">
+        <div class="shop-result-head">
+          <button class="btn btn-sm btn-ghost" onclick="showShopStep(1)">← Modifier la sélection</button>
+          <button class="btn btn-sm btn-outline" onclick="window.print()">Imprimer</button>
+        </div>
+        <div id="shop-aisle-list"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('ov-shop')">Fermer</button>
+      <button class="btn btn-primary" id="shop-generate-btn" onclick="generateShoppingList()">Générer la liste →</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ MODAL : IMPORT ═══════════ -->
+<div class="overlay" id="ov-import">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Importer une recette</h2>
+      <button class="close-btn" onclick="closeModal('ov-import')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="import-tabs">
+        <button class="import-tab active" data-tab="url">🔗 Depuis une URL</button>
+        <button class="import-tab" data-tab="file">📂 Fichier JSON</button>
+        <button class="import-tab" data-tab="text">📋 Coller du texte</button>
+      </div>
+
+      <div id="import-tab-url">
+        <div class="url-import-wrap">
+          <p class="url-import-desc">Collez l'URL d'une recette pour l'importer automatiquement avec sa photo.</p>
+          <div class="url-import-row">
+            <input type="text" id="import-url-input" placeholder="https://www.healthyfoodcreation.fr/… ou lien Instagram / TikTok">
+            <button class="btn btn-primary" id="import-url-btn" onclick="doUrlImport()">Extraire</button>
+          </div>
+          <p class="url-import-hint">✓ Sites de recettes (JSON-LD)  ·  ✓ Instagram (photo + légende)  ·  ✓ TikTok</p>
+        </div>
+        <div id="url-import-status"></div>
+      </div>
+
+      <div id="import-tab-file" style="display:none">
+        <div class="file-drop-zone" id="file-drop-zone">
+          <div class="fdz-icon">📂</div>
+          <p>Glissez un fichier <strong>.json</strong> ici</p>
+          <p class="fdz-or">— ou —</p>
+          <label class="btn btn-outline btn-sm" for="import-file-input" style="cursor:pointer">Choisir un fichier</label>
+          <input type="file" id="import-file-input" accept=".json,application/json" style="display:none">
+          <p class="fdz-filename" id="fdz-filename"></p>
+        </div>
+      </div>
+      <div id="import-tab-text" style="display:none">
+        <p class="import-hint">Collez ici le JSON fourni par Claude :</p>
+        <textarea id="import-json" rows="12" spellcheck="false" placeholder='[{"name":"Tarte tatin","category":"dessert",...}]'></textarea>
+      </div>
+      <div class="import-error" id="import-error"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('ov-import')">Annuler</button>
+      <button class="btn btn-primary" onclick="doImport()">Importer</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ MODAL : PLANNER PICKER ═══════════ -->
+<div class="overlay" id="ov-picker">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Choisir une recette</h2>
+      <button class="close-btn" onclick="closeModal('ov-picker')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" id="picker-search" placeholder="Rechercher…" style="margin-bottom:12px">
+      <div id="picker-list"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ MODAL : GÉRER LES CATÉGORIES ═══════════ -->
+<div class="overlay" id="ov-categories">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Gérer les catégories</h2>
+      <button class="close-btn" onclick="closeModal('ov-categories')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="shop-hint">Les catégories par défaut ne peuvent pas être supprimées.</p>
+      <div id="cat-manager-list"></div>
+      <div class="cat-add-form">
+        <div class="cat-add-title">Nouvelle catégorie</div>
+        <div class="form-3col">
+          <div class="form-group">
+            <label>Emoji</label>
+            <input type="text" id="new-cat-emoji" placeholder="🍲" maxlength="4">
+          </div>
+          <div class="form-group" style="grid-column:span 2">
+            <label>Nom</label>
+            <input type="text" id="new-cat-label" placeholder="Ex : Brunch">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addCustomCategory()" style="margin-top:4px">+ Ajouter</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div class="foot-r">
+        <button class="btn btn-primary" onclick="closeModal('ov-categories')">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div id="toasts"></div>
+<script src="app.js"></script>
+</body>
+</html>
