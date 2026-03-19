@@ -206,7 +206,13 @@
       <div class="form-2col">
         <div class="form-group">
           <label>URL de la photo</label>
-          <input type="text" id="f-photo-url" placeholder="https://…">
+          <div class="photo-url-row">
+            <input type="text" id="f-photo-url" placeholder="https://…">
+            <button type="button" class="btn-gen-photo" id="gen-photo-btn" onclick="generatePhotoForForm()" title="Générer une photo automatiquement">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="8"/><path d="M6 10c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4"/><circle cx="10" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg>
+              Générer
+            </button>
+          </div>
         </div>
         <div class="form-group">
           <label>Uploader une photo</label>

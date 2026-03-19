@@ -692,6 +692,40 @@ function getPhotoSrc(r) {
   return generatePlaceholderSvg(r);
 }
 
+// ── GÉNÉRER PHOTO POUR LE FORMULAIRE ─────────────────
+async function generatePhotoForForm() {
+  const name = document.getElementById('f-name').value.trim();
+  const cat  = document.getElementById('f-cat').value;
+  const btn  = document.getElementById('gen-photo-btn');
+  if (!name) { toast('Saisissez d\'abord le nom de la recette', 'info'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  let photoUrl = null;
+
+  // 1) TheMealDB
+  try {
+    const words = name.split(/\s+/).slice(0, 3).join(' ');
+    const resp  = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(words)}`);
+    const data  = await resp.json();
+    if (data.meals?.[0]?.strMealThumb) photoUrl = data.meals[0].strMealThumb + '/preview';
+  } catch(e) {}
+
+  // 2) Fallback Unsplash par catégorie
+  if (!photoUrl) photoUrl = CAT_FALLBACK_PHOTOS[cat] || CAT_FALLBACK_PHOTOS['plat'];
+
+  // Mettre à jour le champ URL et l'aperçu
+  document.getElementById('f-photo-url').value = photoUrl;
+  const wrap = document.getElementById('photo-preview-wrap');
+  const prev = document.getElementById('photo-preview');
+  prev.src = photoUrl; wrap.style.display = '';
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="8"/><path d="M6 10c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4"/><circle cx="10" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg> Générer';
+  toast('Photo générée ✓');
+}
+
 // Async: try TheMealDB → category fallback → keep SVG
 async function fetchAndSetRealPhoto(recipe, imgEl) {
   if (recipe.photo || _photoCache[recipe.id]) return;
@@ -1504,21 +1538,33 @@ function initSidebarEvents() {
 
 // ── EXPORT ────────────────────────────────────────────
 function forceSyncToCloud() {
-  // Lire directement localStorage — ignore la variable recipes qui peut être écrasée par Firebase
   let localRecipes;
   try { localRecipes = JSON.parse(localStorage.getItem('mes-recettes') || '[]'); } catch { localRecipes = []; }
-  // Filtrer les recettes de démo
   const real = localRecipes.filter(r => !String(r.id).startsWith('demo'));
-  if (!real.length) { toast('Aucune recette à synchroniser', 'info'); return; }
-  toast(`Envoi de ${real.length} recettes vers le cloud…`, 'info');
+
+  console.log('[Sync] Recettes locales:', localRecipes.length, '| Sans démos:', real.length);
+
+  if (!real.length) {
+    toast('Aucune recette trouvée dans ce navigateur', 'info');
+    alert(`Aucune recette à synchroniser.\n\nCette fonction doit être utilisée sur l'ordinateur qui contient vos ${real.length} recettes.\n\nOuvrez le site dans votre navigateur habituel (pas ici) et cliquez Sync cloud.`);
+    return;
+  }
+
+  if (!confirm(`Envoyer ${real.length} recettes vers Firebase ?\n\nCela remplacera les données existantes sur tous vos appareils.`)) return;
+
+  toast(`Envoi de ${real.length} recettes…`, 'info');
   STORE.set({ recipes: real, mealPlan, customCats })
     .then(() => {
       recipes = real;
       localStorage.setItem('mes-recettes', JSON.stringify(real));
       render(); renderSidebar();
-      toast(`✓ ${real.length} recettes synchronisées sur tous vos appareils`);
+      toast(`✓ ${real.length} recettes synchronisées !`);
     })
-    .catch(e => { console.error('Sync error:', e); toast('Erreur — vérifiez votre connexion', 'error'); });
+    .catch(e => {
+      console.error('[Sync] Erreur Firebase:', e);
+      alert('Erreur Firebase : ' + e.message + '\n\nVérifiez votre connexion internet et les règles Firestore.');
+      toast('Erreur de synchronisation', 'error');
+    });
 }
 
 function exportRecipes() {

@@ -746,6 +746,20 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .url-import-defaults { grid-template-columns: 1fr; }
 }
 
+/* ── PHOTO GENERATION ─────────────────────────────────── */
+.photo-url-row { display: flex; gap: 6px; }
+.photo-url-row input { flex: 1; min-width: 0; }
+.btn-gen-photo {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  padding: 7px 11px; border-radius: var(--radius); border: 1.5px solid var(--primary);
+  background: var(--primary-bg); color: var(--primary);
+  font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+  transition: all var(--transition); white-space: nowrap;
+}
+.btn-gen-photo svg { width: 14px; height: 14px; }
+.btn-gen-photo:hover { background: var(--primary); color: #fff; }
+.btn-gen-photo:disabled { opacity: .5; cursor: default; }
+
 /* ── TEXT IMPORT ──────────────────────────────────────── */
 .text-import-wrap { display: flex; flex-direction: column; gap: 10px; }
 #import-text-input {
