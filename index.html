@@ -49,6 +49,10 @@
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 4 12 0 16 4"/><line x1="12" y1="0" x2="12" y2="12"/><path d="M20 12v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-6"/></svg>
       <span class="hbtn-label">Exporter</span>
     </button>
+    <button class="hbtn hbtn-ghost" id="sync-btn" title="Forcer la synchronisation vers le cloud">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4a8 8 0 0 1 12 0"/><path d="M16 16a8 8 0 0 1-12 0"/><polyline points="1 4 4 4 4 7"/><polyline points="19 16 16 16 16 13"/></svg>
+      <span class="hbtn-label">Sync cloud</span>
+    </button>
     <button class="hbtn hbtn-ghost" id="cart-btn" title="Liste de courses">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/><path d="M1 1h3l2 10h10l2.5-6.5H5"/></svg>
       <span class="cart-badge" id="cart-badge"></span>
@@ -352,6 +356,20 @@
           <textarea id="import-url-input" rows="4" placeholder="https://www.healthyfoodcreation.fr/recette-1/
 https://www.healthyfoodcreation.fr/recette-2/
 https://www.instagram.com/p/…"></textarea>
+
+          <div class="url-import-defaults">
+            <div class="url-import-default-field">
+              <label>Catégorie par défaut</label>
+              <select id="import-default-cat">
+                <option value="">Garder celle détectée</option>
+              </select>
+            </div>
+            <div class="url-import-default-field">
+              <label>Tags à ajouter</label>
+              <input type="text" id="import-default-tags" placeholder="ex : rapide, batch cooking, hiver">
+            </div>
+          </div>
+
           <button class="btn btn-primary" id="import-url-btn" onclick="doUrlImport()">Importer</button>
           <p class="url-import-hint">✓ Sites de recettes (JSON-LD)  ·  ✓ Instagram (photo + légende)  ·  ✓ TikTok  ·  ✓ Import en masse</p>
         </div>

@@ -718,7 +718,33 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 }
 #import-url-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-bg); }
 #import-url-input::placeholder { color: var(--text-3); }
+
+.url-import-defaults {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  padding: 12px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.url-import-default-field { display: flex; flex-direction: column; gap: 5px; }
+.url-import-default-field label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-3);
+}
+.url-import-default-field select,
+.url-import-default-field input {
+  width: 100%; padding: 7px 10px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius-s); color: var(--text-1); font-size: 13px;
+  font-family: inherit;
+}
+.url-import-default-field select:focus,
+.url-import-default-field input:focus {
+  outline: none; border-color: var(--primary);
+}
 .url-import-hint { font-size: 11.5px; color: var(--text-3); }
+
+@media (max-width: 500px) {
+  .url-import-defaults { grid-template-columns: 1fr; }
+}
 
 /* ── DRAG & DROP CATÉGORIES ───────────────────────────── */
 .filter-item[draggable="true"] { cursor: grab; }

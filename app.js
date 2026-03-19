@@ -85,8 +85,32 @@ function load() {
   // 2) Synchronisation temps réel via Firebase
   STORE.onSnapshot(snap => {
     if (_ownWrite) { _ownWrite = false; return; } // ignorer nos propres écritures
-    if (!snap.exists) return;
-    const d   = snap.data();
+
+    if (!snap.exists) {
+      // Firebase vide mais localStorage a des données → migration automatique
+      if (recipes.length > 0) {
+        toast('Synchronisation vers le cloud en cours…', 'info');
+        _ownWrite = true;
+        STORE.set({ recipes, mealPlan, customCats })
+          .then(() => toast(`✓ ${recipes.length} recettes synchronisées sur tous vos appareils`))
+          .catch(() => { _ownWrite = false; });
+      }
+      return;
+    }
+
+    const d        = snap.data();
+    const fbCount  = (d.recipes || []).length;
+    const lcCount  = recipes.length;
+
+    // Si localStorage a plus de recettes que Firebase → priorité au local (migration)
+    if (lcCount > fbCount) {
+      _ownWrite = true;
+      STORE.set({ recipes, mealPlan, customCats })
+        .then(() => toast(`✓ ${lcCount} recettes synchronisées`))
+        .catch(() => { _ownWrite = false; });
+      return;
+    }
+
     recipes    = d.recipes    || [];
     mealPlan   = d.mealPlan   || {};
     customCats = d.customCats || [];
@@ -131,16 +155,31 @@ function catPillHtml(c) {
 }
 
 function renderCatSelect() {
+  const cats = Object.values(allCats());
+
+  // Select du formulaire recette
   const sel = document.getElementById('f-cat');
   const cur = sel.value;
   sel.innerHTML = '<option value="">— Choisir —</option>';
-  Object.values(allCats()).forEach(c => {
+  cats.forEach(c => {
     const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = `${c.emoji} ${c.label}`;
+    opt.value = c.id; opt.textContent = `${c.emoji} ${c.label}`;
     if (c.id === cur) opt.selected = true;
     sel.appendChild(opt);
   });
+
+  // Select catégorie par défaut dans l'import URL
+  const imp = document.getElementById('import-default-cat');
+  if (imp) {
+    const impCur = imp.value;
+    imp.innerHTML = '<option value="">Garder celle détectée</option>';
+    cats.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id; opt.textContent = `${c.emoji} ${c.label}`;
+      if (c.id === impCur) opt.selected = true;
+      imp.appendChild(opt);
+    });
+  }
 }
 
 // ── SIDEBAR ───────────────────────────────────────────
@@ -312,14 +351,27 @@ async function doUrlImport() {
   const urls = raw.split('\n').map(u => u.trim()).filter(u => u.startsWith('http'));
   if (!urls.length) { status.innerHTML = '<div class="import-error">Aucune URL valide détectée.</div>'; return; }
 
-  const btn = document.getElementById('import-url-btn');
+  const btn        = document.getElementById('import-url-btn');
+  const defaultCat = document.getElementById('import-default-cat')?.value || '';
+  const defaultTags = (document.getElementById('import-default-tags')?.value || '')
+    .split(',').map(t => t.trim()).filter(Boolean);
   btn.disabled = true;
+
+  // Applique catégorie et tags par défaut à une recette importée
+  function applyDefaults(recipe) {
+    if (defaultCat) recipe.category = defaultCat;
+    if (defaultTags.length) {
+      const existing = recipe.tags || [];
+      recipe.tags = [...new Set([...existing, ...defaultTags])];
+    }
+    return recipe;
+  }
 
   // Une seule URL → ouvre le formulaire pour vérification
   if (urls.length === 1) {
     status.innerHTML = '<div class="url-import-loading"><span class="spinner"></span>Récupération en cours…</div>';
     try {
-      const recipe = await importFromUrl(urls[0]);
+      const recipe = applyDefaults(await importFromUrl(urls[0]));
       status.innerHTML = `<div class="url-import-success">✓ Recette extraite : <strong>${esc(recipe.name || 'Sans titre')}</strong></div>`;
       setTimeout(() => { closeModal('ov-import'); openAddWithData(recipe); }, 900);
     } catch(e) {
@@ -328,12 +380,12 @@ async function doUrlImport() {
     return;
   }
 
-  // Plusieurs URLs → import en masse direct (sans ouvrir le formulaire)
+  // Plusieurs URLs → import en masse direct
   let ok = 0, fail = 0;
   for (let i = 0; i < urls.length; i++) {
     status.innerHTML = `<div class="url-import-loading"><span class="spinner"></span>Import ${i + 1} / ${urls.length}…</div>`;
     try {
-      const recipe = await importFromUrl(urls[i]);
+      const recipe = applyDefaults(await importFromUrl(urls[i]));
       recipe.id = 'r' + Date.now() + Math.random().toString(36).slice(2);
       recipes.push(recipe);
       save();
@@ -341,7 +393,6 @@ async function doUrlImport() {
     } catch(e) {
       fail++;
     }
-    // Petite pause pour ne pas surcharger le proxy
     if (i < urls.length - 1) await new Promise(r => setTimeout(r, 600));
   }
 
@@ -1405,6 +1456,14 @@ function initSidebarEvents() {
 }
 
 // ── EXPORT ────────────────────────────────────────────
+function forceSyncToCloud() {
+  if (!recipes.length) { toast('Aucune recette à synchroniser', 'info'); return; }
+  toast('Synchronisation en cours…', 'info');
+  STORE.set({ recipes, mealPlan, customCats })
+    .then(() => toast(`✓ ${recipes.length} recettes envoyées vers le cloud`))
+    .catch(() => toast('Erreur de synchronisation', 'error'));
+}
+
 function exportRecipes() {
   if (!recipes.length) { toast('Aucune recette à exporter', 'info'); return; }
   const json = JSON.stringify(recipes, null, 2);
@@ -1424,6 +1483,7 @@ function initButtons() {
   document.getElementById('add-btn').addEventListener('click', openAdd);
   document.getElementById('import-btn').addEventListener('click', openImport);
   document.getElementById('export-btn').addEventListener('click', exportRecipes);
+  document.getElementById('sync-btn').addEventListener('click', forceSyncToCloud);
   document.getElementById('cart-btn').addEventListener('click', openShopping);
   document.getElementById('mobile-import-btn').addEventListener('click', () => { closeSidebarFn(); openImport(); });
   document.getElementById('mobile-export-btn').addEventListener('click', () => { closeSidebarFn(); exportRecipes(); });
