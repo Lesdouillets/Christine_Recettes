@@ -1522,6 +1522,8 @@ function openImport() {
   document.getElementById('import-text-input').value     = '';
   document.getElementById('text-import-status').innerHTML = '';
   document.getElementById('file-drop-zone').classList.remove('has-file');
+  const jBtn = document.getElementById('json-import-btn');
+  if (jBtn) { jBtn.disabled = true; jBtn.style.opacity = '.45'; jBtn.style.cursor = 'default'; jBtn.textContent = 'Choisissez un fichier…'; }
   // Reset to URL tab
   document.querySelectorAll('.import-tab').forEach(b => b.classList.remove('active'));
   document.querySelector('.import-tab[data-tab="url"]').classList.add('active');
@@ -1564,16 +1566,23 @@ function handleImportFile(file) {
     document.getElementById('fdz-filename').textContent = `✓ ${file.name} (${Math.round(file.size / 1024)} Ko)`;
     document.getElementById('file-drop-zone').classList.add('has-file');
     document.getElementById('import-error').textContent = '';
+    // Activer le bouton importer
+    const btn = document.getElementById('json-import-btn');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.cursor = ''; btn.textContent = `Importer ${file.name}`; }
   };
   reader.readAsText(file);
 }
 function doImport() {
   const isFileTab = document.querySelector('.import-tab.active')?.dataset.tab === 'file';
-  const raw = isFileTab ? (importFileContent || '') : document.getElementById('import-json').value.trim();
+  const raw = isFileTab ? (importFileContent || '') : '';
   const errEl = document.getElementById('import-error');
   errEl.textContent = '';
+  if (!raw) {
+    errEl.textContent = '⚠️ Sélectionnez d\'abord un fichier JSON en cliquant sur "Choisir un fichier".';
+    return;
+  }
   let data;
-  try { data = JSON.parse(raw); } catch (e) { errEl.textContent = 'JSON invalide : ' + e.message; return; }
+  try { data = JSON.parse(raw); } catch (e) { errEl.textContent = 'Fichier JSON invalide : ' + e.message; return; }
   const list = Array.isArray(data) ? data : [data];
   let added = 0;
   list.forEach(item => {
