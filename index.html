@@ -387,8 +387,23 @@ https://www.instagram.com/p/…"></textarea>
         </div>
       </div>
       <div id="import-tab-text" style="display:none">
-        <p class="import-hint">Collez ici le JSON fourni par Claude :</p>
-        <textarea id="import-json" rows="12" spellcheck="false" placeholder='[{"name":"Tarte tatin","category":"dessert",...}]'></textarea>
+        <div class="text-import-wrap">
+          <p class="url-import-desc">Copiez-collez le texte complet d'une recette (ingrédients + préparation). Les ingrédients seront extraits automatiquement.</p>
+          <textarea id="import-text-input" rows="12" spellcheck="false" placeholder="Pancakes moelleux
+
+Ingrédients :
+200g de farine
+2 œufs
+250ml de lait
+1 sachet de levure
+30g de beurre
+1 pincée de sel
+
+Préparation :
+Mélanger la farine, la levure et le sel..."></textarea>
+          <button class="btn btn-primary" id="import-text-btn" onclick="doTextImport()">Extraire et importer</button>
+        </div>
+        <div id="text-import-status"></div>
       </div>
       <div class="import-error" id="import-error"></div>
     </div>

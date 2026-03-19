@@ -100,9 +100,10 @@ function load() {
 
     const d        = snap.data();
     const fbCount  = (d.recipes || []).length;
-    const lcCount  = recipes.length;
+    // Ne pas compter les recettes de démo dans le local
+    const lcCount  = recipes.filter(r => !String(r.id).startsWith('demo')).length;
 
-    // Si localStorage a plus de recettes que Firebase → priorité au local (migration)
+    // Si localStorage a plus de vraies recettes que Firebase → priorité au local (migration)
     if (lcCount > fbCount) {
       _ownWrite = true;
       STORE.set({ recipes, mealPlan, customCats })
@@ -342,6 +343,51 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 // ── URL IMPORT ────────────────────────────────────────
 const CORS_PROXY = 'https://api.allorigins.win/get?url=';
 const _photoCache = {}; // recipeId → url (in-memory only)
+
+// ── IMPORT DEPUIS TEXTE LIBRE ─────────────────────────
+function doTextImport() {
+  const raw    = document.getElementById('import-text-input').value.trim();
+  const status = document.getElementById('text-import-status');
+  if (!raw) { status.innerHTML = '<div class="import-error">Collez d\'abord le texte d\'une recette.</div>'; return; }
+
+  const lines = raw.split('\n').map(l => l.trim());
+
+  // 1. Nom de la recette = première ligne non vide
+  const name = lines.find(l => l.length > 2 && l.length < 120) || 'Recette importée';
+
+  // 2. Trouver les sections ingrédients / préparation
+  const ING_KW  = /^(ingrédients?|ingredients?|il vous faut|pour (cette|la) recette|pour \d)/i;
+  const PREP_KW = /^(préparation|preparation|instructions?|étapes?|recette|méthode|réalisation|déroulé)/i;
+
+  let ingStart = -1, ingEnd = lines.length, prepStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (ingStart === -1 && ING_KW.test(lines[i])) { ingStart = i + 1; continue; }
+    if (ingStart !== -1 && prepStart === -1 && PREP_KW.test(lines[i])) { ingEnd = i; prepStart = i + 1; break; }
+  }
+
+  // 3. Extraire les ingrédients
+  let ingLines = ingStart !== -1
+    ? lines.slice(ingStart, ingEnd).filter(l => l)
+    : lines.filter(l => /^\d|^[½⅓⅔¼¾]|\b\d+\s*(g|ml|cl|l|kg|c\.s|c\.c|cs|cc|cuillère|tasse|sachet|pincée|botte)\b/i.test(l));
+
+  const ingredients = ingLines.map(l => parseIngredientString(l)).filter(i => i.name && i.name.length > 1);
+
+  // 4. Notes = section préparation
+  const notes = prepStart !== -1 ? lines.slice(prepStart).join('\n').trim() : '';
+
+  if (!ingredients.length) {
+    status.innerHTML = '<div class="import-error">Aucun ingrédient détecté. Assurez-vous que le texte contient une section "Ingrédients".</div>';
+    return;
+  }
+
+  status.innerHTML = `<div class="url-import-success">✓ ${ingredients.length} ingrédients extraits. Vérifiez et complétez ci-dessous.</div>`;
+  setTimeout(() => {
+    closeModal('ov-import');
+    openAddWithData({ name, ingredients, notes });
+    document.getElementById('import-text-input').value = '';
+    status.innerHTML = '';
+  }, 800);
+}
 
 async function doUrlImport() {
   const raw    = document.getElementById('import-url-input').value.trim();
@@ -1457,11 +1503,21 @@ function initSidebarEvents() {
 
 // ── EXPORT ────────────────────────────────────────────
 function forceSyncToCloud() {
-  if (!recipes.length) { toast('Aucune recette à synchroniser', 'info'); return; }
-  toast('Synchronisation en cours…', 'info');
-  STORE.set({ recipes, mealPlan, customCats })
-    .then(() => toast(`✓ ${recipes.length} recettes envoyées vers le cloud`))
-    .catch(() => toast('Erreur de synchronisation', 'error'));
+  // Lire directement localStorage — ignore la variable recipes qui peut être écrasée par Firebase
+  let localRecipes;
+  try { localRecipes = JSON.parse(localStorage.getItem('mes-recettes') || '[]'); } catch { localRecipes = []; }
+  // Filtrer les recettes de démo
+  const real = localRecipes.filter(r => !String(r.id).startsWith('demo'));
+  if (!real.length) { toast('Aucune recette à synchroniser', 'info'); return; }
+  toast(`Envoi de ${real.length} recettes vers le cloud…`, 'info');
+  STORE.set({ recipes: real, mealPlan, customCats })
+    .then(() => {
+      recipes = real;
+      localStorage.setItem('mes-recettes', JSON.stringify(real));
+      render(); renderSidebar();
+      toast(`✓ ${real.length} recettes synchronisées sur tous vos appareils`);
+    })
+    .catch(e => { console.error('Sync error:', e); toast('Erreur — vérifiez votre connexion', 'error'); });
 }
 
 function exportRecipes() {
