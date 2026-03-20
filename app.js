@@ -58,7 +58,7 @@ firebase.initializeApp({
 });
 const db      = firebase.firestore();
 const STORE   = db.collection('data').doc('main');
-const storage = firebase.storage();
+const PHOTOS  = db.collection('photos'); // chaque doc = { photo: "data:..." } pour un recipeId
 let _ownWrite = false; // évite re-render inutile sur notre propre écriture
 
 // ── ÉTAT ──────────────────────────────────────────────
@@ -103,6 +103,31 @@ function mergePhotos(arr) {
   return arr.map(r => (map[r.id] && !r.photo) ? {...r, photo: map[r.id]} : r);
 }
 
+// ── SYNC PHOTOS FIRESTORE ─────────────────────────────
+// Sauvegarde une photo dans Firestore (collection photos/{recipeId})
+function savePhotoToCloud(recipeId, photoData) {
+  if (!recipeId || !photoData || !photoData.startsWith('data:')) return;
+  PHOTOS.doc(String(recipeId)).set({ photo: photoData, updatedAt: Date.now() })
+    .catch(e => console.warn('Photo cloud save:', e));
+}
+// Supprime une photo de Firestore
+function deletePhotoFromCloud(recipeId) {
+  if (!recipeId) return;
+  PHOTOS.doc(String(recipeId)).delete().catch(() => {});
+}
+// Charge toutes les photos depuis Firestore → fusionne dans le store local
+async function loadPhotosFromCloud() {
+  try {
+    const snap = await PHOTOS.get();
+    if (snap.empty) return;
+    const map = loadPhotoStore();
+    snap.forEach(doc => { if (doc.data().photo) map[doc.id] = doc.data().photo; });
+    savePhotoStore(map);
+    recipes = mergePhotos(recipes);
+    render();
+  } catch(e) { console.warn('Photo cloud load:', e); }
+}
+
 // ── PERSISTANCE ───────────────────────────────────────
 function load() {
   // 1) Affichage immédiat depuis le cache local
@@ -113,6 +138,9 @@ function load() {
   // Migrer les photos base64 vers le store séparé + les fusionner
   migratePhotosToStore(recipes);
   recipes = mergePhotos(recipes);
+
+  // 2b) Charger les photos depuis Firestore en arrière-plan (sync multi-appareils)
+  loadPhotosFromCloud();
 
   // 2) Synchronisation temps réel via Firebase
   STORE.onSnapshot(snap => {
@@ -1119,6 +1147,10 @@ function deleteRecipeById(id) {
     if (mealPlan[date].midi === id) mealPlan[date].midi = null;
     if (mealPlan[date].soir === id) mealPlan[date].soir = null;
   });
+  // Supprimer la photo du store local et de Firestore
+  const photoMap = loadPhotoStore();
+  if (photoMap[id]) { delete photoMap[id]; savePhotoStore(photoMap); }
+  deletePhotoFromCloud(id);
   save(); render(); toast('Recette supprimée', 'info');
 }
 
@@ -1469,28 +1501,16 @@ function initPhotoInputs() {
         // Afficher l'aperçu immédiatement
         const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
         showPhotoPreview(dataUrl);
-        // Uploader vers Firebase Storage
+        // Stocker dans le store local ET dans Firestore (sync multi-appareils)
         const recipeId = document.getElementById('f-id').value || uid();
         document.getElementById('f-id').value = recipeId; // fixer l'ID
-        toast('⬆️ Upload de la photo…', 'info');
-        canvas.toBlob(blob => {
-          const ref = storage.ref(`photos/${recipeId}.jpg`);
-          ref.put(blob, { contentType: 'image/jpeg' })
-            .then(() => ref.getDownloadURL())
-            .then(url => {
-              document.getElementById('f-photo-url').value = url;
-              showPhotoPreview(url);
-              toast('✅ Photo uploadée !');
-            })
-            .catch(err => {
-              console.warn('Upload Firebase Storage échoué, photo conservée en local:', err);
-              // Fallback : garder en base64 dans le store local
-              const map = loadPhotoStore();
-              map[recipeId] = dataUrl;
-              savePhotoStore(map);
-              toast('Photo enregistrée en local', 'info');
-            });
-        }, 'image/jpeg', 0.82);
+        const map = loadPhotoStore();
+        map[recipeId] = dataUrl;
+        savePhotoStore(map);
+        document.getElementById('f-photo-url').value = dataUrl;
+        toast('⬆️ Sauvegarde de la photo…', 'info');
+        savePhotoToCloud(recipeId, dataUrl);
+        toast('✅ Photo sauvegardée (visible sur tous vos appareils) !');
       };
       img.src = ev.target.result;
     };
@@ -1899,6 +1919,8 @@ function forceLoadFromCloud() {
     localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
     render(); renderSidebar(); renderTagCloud(); renderCatSelect();
     toast(`✓ ${fbRecipes.length} recettes chargées depuis Firebase !`);
+    // Charger aussi les photos depuis Firestore
+    loadPhotosFromCloud();
   }).catch(e => {
     alert('Erreur Firebase : ' + e.message);
     toast('Erreur de connexion', 'error');
