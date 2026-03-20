@@ -56,8 +56,9 @@ firebase.initializeApp({
   messagingSenderId: "239169207922",
   appId:             "1:239169207922:web:1b3d67548cc7bbd8ad0ceb"
 });
-const db    = firebase.firestore();
-const STORE = db.collection('data').doc('main');
+const db      = firebase.firestore();
+const STORE   = db.collection('data').doc('main');
+const storage = firebase.storage();
 let _ownWrite = false; // évite re-render inutile sur notre propre écriture
 
 // ── ÉTAT ──────────────────────────────────────────────
@@ -1456,6 +1457,7 @@ function initPhotoInputs() {
     reader.onload = ev => {
       const img = new Image();
       img.onload = () => {
+        // Redimensionner
         const canvas = document.createElement('canvas');
         const max = 900; let w = img.width, h = img.height;
         if (w > max || h > max) {
@@ -1464,7 +1466,31 @@ function initPhotoInputs() {
         }
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        showPhotoPreview(canvas.toDataURL('image/jpeg', 0.82));
+        // Afficher l'aperçu immédiatement
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        showPhotoPreview(dataUrl);
+        // Uploader vers Firebase Storage
+        const recipeId = document.getElementById('f-id').value || uid();
+        document.getElementById('f-id').value = recipeId; // fixer l'ID
+        toast('⬆️ Upload de la photo…', 'info');
+        canvas.toBlob(blob => {
+          const ref = storage.ref(`photos/${recipeId}.jpg`);
+          ref.put(blob, { contentType: 'image/jpeg' })
+            .then(() => ref.getDownloadURL())
+            .then(url => {
+              document.getElementById('f-photo-url').value = url;
+              showPhotoPreview(url);
+              toast('✅ Photo uploadée !');
+            })
+            .catch(err => {
+              console.warn('Upload Firebase Storage échoué, photo conservée en local:', err);
+              // Fallback : garder en base64 dans le store local
+              const map = loadPhotoStore();
+              map[recipeId] = dataUrl;
+              savePhotoStore(map);
+              toast('Photo enregistrée en local', 'info');
+            });
+        }, 'image/jpeg', 0.82);
       };
       img.src = ev.target.result;
     };
