@@ -150,6 +150,21 @@ async function loadPhotosFromCloud() {
 
 // ── PERSISTANCE ───────────────────────────────────────
 function load() {
+  // 0) Nettoyage automatique : supprimer les photos base64 de mes-recettes
+  //    (elles vont dans Firestore maintenant — libère le localStorage)
+  try {
+    localStorage.removeItem('mes-recettes-photos'); // vider l'ancien store photos
+    const raw = localStorage.getItem('mes-recettes');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (arr.some(r => r.photo && r.photo.startsWith('data:'))) {
+        localStorage.setItem('mes-recettes', JSON.stringify(
+          arr.map(r => { if (r.photo?.startsWith('data:')) { const {photo,...rest}=r; return rest; } return r; })
+        ));
+      }
+    }
+  } catch(e) {}
+
   // 1) Affichage immédiat depuis le cache local
   try { recipes    = JSON.parse(localStorage.getItem('mes-recettes')         || '[]'); } catch { recipes = []; }
   try { mealPlan   = JSON.parse(localStorage.getItem('mes-repas')            || '{}'); } catch { mealPlan = {}; }
@@ -546,7 +561,7 @@ function renderUrlTodo() {
 
 // ── URL IMPORT ────────────────────────────────────────
 const CORS_PROXY = 'https://api.allorigins.win/get?url=';
-const _photoCache = {}; // recipeId → url (in-memory only)
+const _photoUrlCache = {}; // recipeId → url générée (in-memory only)
 
 // ── IMPORT DEPUIS TEXTE LIBRE ─────────────────────────
 function doTextImport() {
@@ -916,7 +931,7 @@ function generatePlaceholderSvg(recipe) {
 // Returns the photo to display — uses cached real photo or SVG placeholder
 function getPhotoSrc(r) {
   if (r.photo) return r.photo;
-  if (_photoCache[r.id]) return _photoCache[r.id];
+  if (_photoUrlCache[r.id]) return _photoCache[r.id];
   return generatePlaceholderSvg(r);
 }
 
@@ -1022,7 +1037,7 @@ async function generatePhotoForForm() {
 
 // Async: try TheMealDB → category fallback → keep SVG
 async function fetchAndSetRealPhoto(recipe, imgEl) {
-  if (recipe.photo || _photoCache[recipe.id]) return;
+  if (recipe.photo || _photoUrlCache[recipe.id]) return;
   try {
     // 1) TheMealDB search by recipe name
     const words  = recipe.name.trim().split(/\s+/).slice(0, 3).join(' ');
@@ -1031,7 +1046,7 @@ async function fetchAndSetRealPhoto(recipe, imgEl) {
     const data   = await resp.json();
     if (data.meals?.[0]?.strMealThumb) {
       const url = data.meals[0].strMealThumb + '/preview';
-      _photoCache[recipe.id] = url;
+      _photoUrlCache[recipe.id] = url;
       if (imgEl && imgEl.isConnected) imgEl.src = url;
       return;
     }
@@ -1039,7 +1054,7 @@ async function fetchAndSetRealPhoto(recipe, imgEl) {
 
   // 2) Category fallback (Unsplash curated)
   const fallback = CAT_FALLBACK_PHOTOS[recipe.category] || CAT_FALLBACK_PHOTOS['plat'];
-  _photoCache[recipe.id] = fallback;
+  _photoUrlCache[recipe.id] = fallback;
   if (imgEl && imgEl.isConnected) imgEl.src = fallback;
 }
 
