@@ -200,7 +200,7 @@ function load() {
       return;
     }
 
-    recipes    = d.recipes    || [];
+    recipes    = mergePhotos(d.recipes || []);
     mealPlan   = d.mealPlan   || {};
     customCats = d.customCats || [];
     // Cache local (sans photos — elles restent dans Firestore)
@@ -924,6 +924,11 @@ function generatePlaceholderSvg(recipe) {
 // Returns the photo to display — uses cached real photo or SVG placeholder
 function getPhotoSrc(r) {
   if (r.photo) return r.photo;
+  // Vérifier le cache Firestore (photos uploadées)
+  if (_photoCache) {
+    const stored = _photoCache[r.id] || _photoCache[String(r.id)];
+    if (stored) return stored;
+  }
   if (_photoUrlCache[r.id]) return _photoUrlCache[r.id];
   return generatePlaceholderSvg(r);
 }
