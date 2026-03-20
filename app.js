@@ -150,29 +150,22 @@ async function loadPhotosFromCloud() {
 
 // ── PERSISTANCE ───────────────────────────────────────
 function load() {
-  // 0) Nettoyage automatique : supprimer les photos base64 de mes-recettes
-  //    (elles vont dans Firestore maintenant — libère le localStorage)
+  // 0) Nettoyage : virer toute photo base64 du localStorage (Firestore = source des photos)
+  localStorage.removeItem('mes-recettes-photos');
   try {
-    localStorage.removeItem('mes-recettes-photos'); // vider l'ancien store photos
     const raw = localStorage.getItem('mes-recettes');
-    if (raw) {
+    if (raw && raw.includes('"data:')) {
       const arr = JSON.parse(raw);
-      if (arr.some(r => r.photo && r.photo.startsWith('data:'))) {
-        localStorage.setItem('mes-recettes', JSON.stringify(
-          arr.map(r => { if (r.photo?.startsWith('data:')) { const {photo,...rest}=r; return rest; } return r; })
-        ));
-      }
+      const stripped = arr.map(r => { const {photo,...rest}=r; return rest; });
+      localStorage.setItem('mes-recettes', JSON.stringify(stripped));
     }
-  } catch(e) {}
+  } catch(e) { localStorage.removeItem('mes-recettes'); }
 
   // 1) Affichage immédiat depuis le cache local
   try { recipes    = JSON.parse(localStorage.getItem('mes-recettes')         || '[]'); } catch { recipes = []; }
   try { mealPlan   = JSON.parse(localStorage.getItem('mes-repas')            || '{}'); } catch { mealPlan = {}; }
   try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
   try { urlTodo    = JSON.parse(localStorage.getItem('mes-urls-todo')         || '[]'); } catch { urlTodo = []; }
-  // Migrer les photos base64 vers le store séparé + les fusionner
-  migratePhotosToStore(recipes);
-  recipes = mergePhotos(recipes);
 
   // 2b) Charger les photos depuis Firestore en arrière-plan (sync multi-appareils)
   loadPhotosFromCloud();
@@ -207,13 +200,13 @@ function load() {
       return;
     }
 
-    recipes    = mergePhotos(d.recipes || []);
+    recipes    = d.recipes    || [];
     mealPlan   = d.mealPlan   || {};
     customCats = d.customCats || [];
-    // Mettre à jour le cache local
-    localStorage.setItem('mes-recettes',          JSON.stringify(recipes));
-    localStorage.setItem('mes-repas',             JSON.stringify(mealPlan));
-    localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
+    // Cache local (sans photos — elles restent dans Firestore)
+    try { localStorage.setItem('mes-recettes',          JSON.stringify(recipes)); } catch(e) {}
+    try { localStorage.setItem('mes-repas',             JSON.stringify(mealPlan)); } catch(e) {}
+    try { localStorage.setItem('mes-categories-custom', JSON.stringify(customCats)); } catch(e) {}
     // Re-rendre l'interface
     renderSidebar(); renderTagCloud(); renderCatSelect(); render();
   }, err => console.warn('Firebase sync:', err));
@@ -931,7 +924,7 @@ function generatePlaceholderSvg(recipe) {
 // Returns the photo to display — uses cached real photo or SVG placeholder
 function getPhotoSrc(r) {
   if (r.photo) return r.photo;
-  if (_photoUrlCache[r.id]) return _photoCache[r.id];
+  if (_photoUrlCache[r.id]) return _photoUrlCache[r.id];
   return generatePlaceholderSvg(r);
 }
 
@@ -1163,7 +1156,7 @@ function makeCard(r) {
   });
 
   // Async: replace SVG placeholder with real photo
-  if (!r.photo && !_photoCache[r.id]) {
+  if (!r.photo && !_photoUrlCache[r.id]) {
     const imgEl = div.querySelector('img');
     fetchAndSetRealPhoto(r, imgEl);
   }
