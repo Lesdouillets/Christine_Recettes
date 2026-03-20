@@ -79,25 +79,45 @@ let pickerSlot     = null;
 
 // ── PHOTOS LOCALES (stockage séparé, jamais écrasé par Firebase) ──────────
 // { [recipeId]: "data:image/..." }
+// ── PHOTO STORE (cache mémoire uniquement — Firestore est la source de vérité) ──
+let _photoCache = null; // cache en mémoire, évite les lectures localStorage répétées
+
 function loadPhotoStore() {
-  try { return JSON.parse(localStorage.getItem('mes-recettes-photos') || '{}'); } catch { return {}; }
+  if (_photoCache) return _photoCache;
+  try { _photoCache = JSON.parse(localStorage.getItem('mes-recettes-photos') || '{}'); }
+  catch { _photoCache = {}; }
+  return _photoCache;
 }
 function savePhotoStore(map) {
-  localStorage.setItem('mes-recettes-photos', JSON.stringify(map));
+  _photoCache = map;
+  try { localStorage.setItem('mes-recettes-photos', JSON.stringify(map)); }
+  catch(e) {
+    // localStorage plein : on garde en mémoire uniquement (Firestore reste la source de vérité)
+    console.warn('localStorage photos plein, cache mémoire uniquement');
+  }
 }
-// Extrait les photos base64 des recettes → les met dans le store séparé
+// Extrait les photos base64 des recettes → store séparé + nettoie mes-recettes
 function migratePhotosToStore(arr) {
   const map = loadPhotoStore();
-  let changed = false;
+  let hasNew = false;
   arr.forEach(r => {
     if (r.photo && r.photo.startsWith('data:') && !map[r.id]) {
-      map[r.id] = r.photo; changed = true;
+      map[r.id] = r.photo; hasNew = true;
     }
   });
-  if (changed) savePhotoStore(map);
+  if (hasNew) {
+    // Sauvegarder les photos dans le store séparé
+    savePhotoStore(map);
+    // Supprimer les photos de mes-recettes pour libérer de la place
+    const stripped = arr.map(r => {
+      if (r.photo && r.photo.startsWith('data:')) { const {photo,...rest}=r; return rest; }
+      return r;
+    });
+    try { localStorage.setItem('mes-recettes', JSON.stringify(stripped)); } catch(e) {}
+  }
   return map;
 }
-// Fusionne les photos du store dans un tableau de recettes
+// Fusionne les photos (cache mémoire) dans un tableau de recettes
 function mergePhotos(arr) {
   const map = loadPhotoStore();
   return arr.map(r => (map[r.id] && !r.photo) ? {...r, photo: map[r.id]} : r);
@@ -115,7 +135,7 @@ function deletePhotoFromCloud(recipeId) {
   if (!recipeId) return;
   PHOTOS.doc(String(recipeId)).delete().catch(() => {});
 }
-// Charge toutes les photos depuis Firestore → fusionne dans le store local
+// Charge toutes les photos depuis Firestore → cache mémoire + render
 async function loadPhotosFromCloud() {
   try {
     const snap = await PHOTOS.get();
