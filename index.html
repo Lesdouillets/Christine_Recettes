@@ -41,19 +41,23 @@
   </div>
 
   <div class="header-actions">
-    <button class="hbtn hbtn-ghost" id="import-btn" title="Importer des recettes">
+    <!-- Bouton À importer — visible uniquement sur mobile, ouvre directement l'onglet todo -->
+    <button class="hbtn hbtn-ghost hbtn-mobile-todo" id="mobile-todo-btn" title="À importer" onclick="openImportTab('todo')">
+      📌
+    </button>
+    <button class="hbtn hbtn-ghost hbtn-desktop" id="import-btn" title="Importer des recettes">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 16 12 20 16 16"/><line x1="12" y1="8" x2="12" y2="20"/><path d="M20 12a8 8 0 1 0-16 0"/></svg>
       <span class="hbtn-label">Importer</span>
     </button>
-    <button class="hbtn hbtn-ghost" id="export-btn" title="Exporter toutes les recettes">
+    <button class="hbtn hbtn-ghost hbtn-desktop" id="export-btn" title="Exporter toutes les recettes">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 4 12 0 16 4"/><line x1="12" y1="0" x2="12" y2="12"/><path d="M20 12v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-6"/></svg>
       <span class="hbtn-label">Exporter</span>
     </button>
-    <button class="hbtn hbtn-ghost" id="sync-btn" title="Envoyer mes recettes vers le cloud">
+    <button class="hbtn hbtn-ghost hbtn-desktop" id="sync-btn" title="Envoyer mes recettes vers le cloud">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4a8 8 0 0 1 12 0"/><path d="M16 16a8 8 0 0 1-12 0"/><polyline points="1 4 4 4 4 7"/><polyline points="19 16 16 16 16 13"/></svg>
       <span class="hbtn-label">↑ Cloud</span>
     </button>
-    <button class="hbtn hbtn-ghost" id="load-cloud-btn" onclick="forceLoadFromCloud()" title="Charger les recettes depuis le cloud">
+    <button class="hbtn hbtn-ghost hbtn-desktop" id="load-cloud-btn" onclick="forceLoadFromCloud()" title="Charger les recettes depuis le cloud">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4a8 8 0 0 1 12 0"/><path d="M16 16a8 8 0 0 1-12 0"/><polyline points="1 4 4 4 4 7"/><polyline points="19 16 16 16 16 13"/></svg>
       <span class="hbtn-label">↓ Cloud</span>
     </button>
@@ -63,7 +67,7 @@
     </button>
     <button class="hbtn hbtn-primary" id="add-btn">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
-      Recette
+      <span class="hbtn-label">Recette</span>
     </button>
   </div>
 </header>

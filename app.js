@@ -1602,7 +1602,9 @@ function generateShoppingList() {
 // ── IMPORT ────────────────────────────────────────────
 let importFileContent = null;
 
-function openImport() {
+function openImport() { openImportTab('url'); }
+
+function openImportTab(tab) {
   document.getElementById('import-error').textContent    = '';
   document.getElementById('fdz-filename').textContent    = '';
   document.getElementById('import-url-input').value      = '';
@@ -1610,14 +1612,16 @@ function openImport() {
   document.getElementById('import-text-input').value     = '';
   document.getElementById('text-import-status').innerHTML = '';
   document.getElementById('file-drop-zone').classList.remove('has-file');
-  // Reset to URL tab
-  document.querySelectorAll('.import-tab').forEach(b => b.classList.remove('active'));
-  document.querySelector('.import-tab[data-tab="url"]').classList.add('active');
-  document.getElementById('import-tab-url').style.display  = '';
-  document.getElementById('import-tab-file').style.display = 'none';
-  document.getElementById('import-tab-text').style.display = 'none';
-  document.getElementById('import-tab-todo').style.display = 'none';
   importFileContent = null;
+  // Activer l'onglet demandé
+  const activeTab = tab || 'url';
+  document.querySelectorAll('.import-tab').forEach(b => b.classList.remove('active'));
+  const tabBtn = document.querySelector(`.import-tab[data-tab="${activeTab}"]`);
+  if (tabBtn) tabBtn.classList.add('active');
+  document.getElementById('import-tab-url').style.display  = activeTab === 'url'  ? '' : 'none';
+  document.getElementById('import-tab-file').style.display = activeTab === 'file' ? '' : 'none';
+  document.getElementById('import-tab-text').style.display = activeTab === 'text' ? '' : 'none';
+  document.getElementById('import-tab-todo').style.display = activeTab === 'todo' ? '' : 'none';
   renderUrlTodo();
   openModal('ov-import');
 }

@@ -921,15 +921,28 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .modal-wide { max-width: 100%; }
 }
 
+/* Bouton todo mobile : caché sur desktop */
+.hbtn-mobile-todo { display: none; }
+/* Boutons desktop-only */
+.hbtn-desktop { display: flex; }
+
+@media (max-width: 768px) {
+  /* Cacher les boutons desktop-only sur tablette/mobile */
+  .hbtn-desktop { display: none !important; }
+  /* Afficher le bouton 📌 À importer */
+  .hbtn-mobile-todo { display: flex; font-size: 18px; }
+}
+
 @media (max-width: 500px) {
   :root { --header-h: 54px; }
   .brand-name { display: none; }
-  .header { padding: 0 12px; gap: 8px; }
-  .header-search { max-width: none; flex: 1; min-width: 0; }
+  .header { padding: 0 10px; gap: 6px; }
+  .header-search { flex: 1; min-width: 0; max-width: none; }
   .recipe-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .card-photo, .card-photo-placeholder { height: 130px; }
   .main { padding: 10px; }
-  /* Cacher import/export du header sur mobile (accessible dans le menu) */
-  #import-btn, #export-btn { display: none; }
-  /* Garder le panier et +Recette visibles */
+  /* Sur mobile : header = hamburger | search | 📌 | 🛒 | + */
+  .hbtn-mobile-todo { font-size: 20px; padding: 0 8px; }
+  /* Masquer le label "+ Recette" sur mobile (garder juste l'icône +) */
+  #add-btn .hbtn-label { display: none; }
 }
