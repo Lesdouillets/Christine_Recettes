@@ -1160,11 +1160,7 @@ function makeCard(r) {
     }
   });
 
-  // Async: replace SVG placeholder with real photo
-  if (!r.photo && !_photoUrlCache[r.id]) {
-    const imgEl = div.querySelector('img');
-    fetchAndSetRealPhoto(r, imgEl);
-  }
+  // Pas de génération auto — l'utilisateur clique sur le bouton photo pour en générer une
 
   return div;
 }
