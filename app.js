@@ -1979,15 +1979,35 @@ function exportRecipes() {
   toast(`${recipes.length} recettes exportées ✓`);
 }
 
+// ── MENU "···" ────────────────────────────────────────
+function toggleMoreMenu() {
+  const m = document.getElementById('hbtn-more-menu');
+  m.classList.toggle('open');
+}
+function closeMoreMenu() {
+  document.getElementById('hbtn-more-menu')?.classList.remove('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#hbtn-more-wrap')) closeMoreMenu();
+});
+function openShop() { openShopping(); }
+
+// ── DATE DERNIÈRE RECETTE IMPORTÉE ────────────────────
+function renderLastImportDate() {
+  const el = document.getElementById('last-import-date');
+  if (!el || !recipes.length) return;
+  const dates = recipes.map(r => r.dateAdded || r.updatedAt).filter(Boolean).map(d => new Date(d));
+  const last = new Date(Math.max(...dates));
+  if (isNaN(last)) return;
+  el.textContent = `Dernière import : ${last.toLocaleDateString('fr-FR')} ${last.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;
+}
+
 // ── BUTTONS GLOBAUX ───────────────────────────────────
 function initButtons() {
-  document.getElementById('add-btn').addEventListener('click', openAdd);
   document.getElementById('import-btn').addEventListener('click', openImport);
-  document.getElementById('export-btn').addEventListener('click', exportRecipes);
-  document.getElementById('sync-btn').addEventListener('click', forceSyncToCloud);
-  document.getElementById('cart-btn').addEventListener('click', openShopping);
-  document.getElementById('mobile-import-btn').addEventListener('click', () => { closeSidebarFn(); openImport(); });
-  document.getElementById('mobile-export-btn').addEventListener('click', () => { closeSidebarFn(); exportRecipes(); });
+  document.getElementById('mobile-import-btn')?.addEventListener('click', () => { closeSidebarFn(); openImport(); });
+  document.getElementById('mobile-export-btn')?.addEventListener('click', () => { closeSidebarFn(); exportRecipes(); });
+  renderLastImportDate();
 
   document.querySelectorAll('.overlay').forEach(ov => {
     ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });

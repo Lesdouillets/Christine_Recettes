@@ -925,15 +925,59 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 .hbtn-mobile-only { display: none; }
 .hbtn-desktop { display: flex; }
 
-/* Boutons secondaires : plus petits, moins contrastés */
-.hbtn-secondary {
-  opacity: 0.55;
-  font-size: 12px;
-  padding: 0 8px;
-  min-width: 0;
+/* Menu "···" dropdown */
+.hbtn-more-wrap { position: relative; }
+#more-btn { font-size: 18px; letter-spacing: 2px; padding: 0 10px; opacity: 0.5; }
+#more-btn:hover { opacity: 1; }
+.hbtn-more-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  min-width: 190px;
+  z-index: 200;
+  overflow: hidden;
 }
-.hbtn-secondary:hover { opacity: 1; }
-.hbtn-secondary svg { width: 14px; height: 14px; }
+.hbtn-more-menu.open { display: block; }
+.hbtn-more-menu button {
+  display: block; width: 100%;
+  text-align: left;
+  padding: 10px 16px;
+  background: none; border: none;
+  font-size: 13px; color: var(--text);
+  cursor: pointer;
+}
+.hbtn-more-menu button:hover { background: var(--bg); }
+
+/* Badge courses flottant */
+.cart-badge-standalone {
+  display: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 99px;
+  padding: 1px 6px;
+  margin-left: -8px;
+  margin-top: -14px;
+  align-self: flex-start;
+}
+.cart-badge-standalone.visible { display: inline-block; }
+
+/* Info dernière import */
+.last-import-info {
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 500;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: var(--primary-lt, #f0f7ff);
+  border-radius: 6px;
+}
 
 /* Date mise à jour dans le détail */
 .detail-updated {

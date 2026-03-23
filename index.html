@@ -42,38 +42,35 @@
   </div>
 
   <div class="header-actions">
-    <!-- MOBILE : À importer en premier -->
+    <!-- MOBILE : À importer — tout à droite, bien visible -->
     <button class="hbtn hbtn-primary hbtn-mobile-only" id="mobile-todo-btn" title="À importer" onclick="openImportTab('todo')">
       📌 <span class="hbtn-label">À importer</span>
     </button>
-    <!-- DESKTOP : Import texte en premier -->
+    <!-- DESKTOP : Import texte en premier plan -->
     <button class="hbtn hbtn-primary hbtn-desktop" id="text-import-btn" onclick="openImportTab('text')" title="Importer via texte">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="17" y2="6"/><line x1="3" y1="10" x2="13" y2="10"/><line x1="3" y1="14" x2="10" y2="14"/></svg>
       <span class="hbtn-label">Import texte</span>
     </button>
-    <!-- Importer (secondaire) -->
-    <button class="hbtn hbtn-ghost hbtn-desktop hbtn-secondary" id="import-btn" title="Importer des recettes">
+    <!-- Importer URL (secondaire desktop) -->
+    <button class="hbtn hbtn-ghost hbtn-desktop hbtn-secondary" id="import-btn" title="Importer une recette">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 16 12 20 16 16"/><line x1="12" y1="8" x2="12" y2="20"/><path d="M20 12a8 8 0 1 0-16 0"/></svg>
       <span class="hbtn-label">Importer</span>
     </button>
-    <!-- Secondaires regroupés -->
-    <button class="hbtn hbtn-ghost hbtn-desktop hbtn-secondary" id="export-btn" title="Exporter">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 4 12 0 16 4"/><line x1="12" y1="0" x2="12" y2="12"/><path d="M20 12v6a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-6"/></svg>
-    </button>
-    <button class="hbtn hbtn-ghost hbtn-desktop hbtn-secondary" id="sync-btn" title="↑ Cloud">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3v11"/><polyline points="6 10 10 3 14 10"/><path d="M4 17h12"/></svg>
-    </button>
-    <button class="hbtn hbtn-ghost hbtn-desktop hbtn-secondary" id="load-cloud-btn" onclick="forceLoadFromCloud()" title="↓ Cloud">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 17V6"/><polyline points="6 10 10 17 14 10"/><path d="M4 3h12"/></svg>
-    </button>
-    <button class="hbtn hbtn-ghost hbtn-secondary" id="cart-btn" title="Liste de courses">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/><path d="M1 1h3l2 10h10l2.5-6.5H5"/></svg>
-      <span class="cart-badge" id="cart-badge"></span>
-    </button>
-    <button class="hbtn hbtn-ghost hbtn-secondary" id="add-btn">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
-      <span class="hbtn-label hbtn-desktop">+ Recette</span>
-    </button>
+    <!-- Menu "…" regroupant Export / Cloud / Courses / +Recette -->
+    <div class="hbtn-more-wrap" id="hbtn-more-wrap">
+      <button class="hbtn hbtn-ghost hbtn-secondary" id="more-btn" onclick="toggleMoreMenu()" title="Plus d'options">
+        •••
+      </button>
+      <div class="hbtn-more-menu" id="hbtn-more-menu">
+        <button onclick="exportRecipes(); closeMoreMenu()">📤 Exporter</button>
+        <button id="sync-btn" onclick="forceSyncToCloud(); closeMoreMenu()">☁️ ↑ Envoyer cloud</button>
+        <button id="load-cloud-btn" onclick="forceLoadFromCloud(); closeMoreMenu()">☁️ ↓ Charger cloud</button>
+        <button onclick="openShop(); closeMoreMenu()">🛒 Liste de courses</button>
+        <button id="add-btn" onclick="openAdd(); closeMoreMenu()">➕ Nouvelle recette</button>
+      </div>
+    </div>
+    <!-- Badge courses (visible partout) -->
+    <span class="cart-badge-standalone" id="cart-badge"></span>
   </div>
 </header>
 
@@ -420,6 +417,7 @@ Faire cuire dans une poêle beurrée 2 min de chaque côté."></textarea>
       </div>
       <div id="import-tab-todo" style="display:none">
         <div class="todo-tab-wrap">
+          <div id="last-import-date" class="last-import-info"></div>
           <p class="url-import-desc">Enregistrez des URLs à importer plus tard. Revenez quand vous voulez pour les importer une par une.</p>
           <div class="todo-add-row">
             <textarea id="todo-url-input" rows="2" placeholder="https://www.marmiton.org/recette/…&#10;https://www.750g.com/…" spellcheck="false"></textarea>
