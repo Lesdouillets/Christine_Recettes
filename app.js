@@ -1657,6 +1657,7 @@ function openImportTab(tab) {
   document.getElementById('import-tab-text').style.display = activeTab === 'text' ? '' : 'none';
   document.getElementById('import-tab-todo').style.display = activeTab === 'todo' ? '' : 'none';
   renderUrlTodo();
+  if (activeTab === 'todo') renderLastImportDate();
   openModal('ov-import');
 }
 function initImportTabs() {
@@ -1669,7 +1670,7 @@ function initImportTabs() {
       document.getElementById('import-tab-file').style.display = tab === 'file' ? '' : 'none';
       document.getElementById('import-tab-text').style.display = tab === 'text' ? '' : 'none';
       document.getElementById('import-tab-todo').style.display = tab === 'todo' ? '' : 'none';
-      if (tab === 'todo') renderUrlTodo();
+      if (tab === 'todo') { renderUrlTodo(); renderLastImportDate(); }
     });
   });
   const fileInput = document.getElementById('import-file-input');
