@@ -1167,10 +1167,10 @@ function makeCard(r) {
 
 // ── DELETE ON CARD ────────────────────────────────────
 function deleteRecipeById(id) {
-  const r = recipes.find(x => x.id === id);
+  const r = recipes.find(x => String(x.id) === String(id));
   if (!r) return;
   if (!confirm(`Supprimer « ${r.name} » définitivement ?`)) return;
-  recipes = recipes.filter(x => x.id !== id);
+  recipes = recipes.filter(x => String(x.id) !== String(id));
   cartSet.delete(id);
   Object.keys(mealPlan).forEach(date => {
     if (mealPlan[date].midi === id) mealPlan[date].midi = null;
@@ -1433,9 +1433,9 @@ function saveRecipe() {
 function deleteCurrentRecipe() {
   const id = document.getElementById('f-id').value;
   if (!id) return;
-  const r = recipes.find(x => x.id === id);
+  const r = recipes.find(x => String(x.id) === String(id));
   if (!r || !confirm(`Supprimer « ${r.name} » définitivement ?`)) return;
-  recipes = recipes.filter(x => x.id !== id);
+  recipes = recipes.filter(x => String(x.id) !== String(id));
   cartSet.delete(id);
   Object.keys(mealPlan).forEach(date => {
     if (mealPlan[date].midi === id) mealPlan[date].midi = null;
