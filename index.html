@@ -33,6 +33,7 @@
   <nav class="header-nav">
     <button class="nav-tab active" data-view="recipes">Recettes</button>
     <button class="nav-tab" data-view="planner">Planning</button>
+    <button class="nav-tab" data-view="shop">🛒 Courses</button>
   </nav>
 
   <div class="header-search">
@@ -154,6 +155,22 @@
       <div class="planner-scroll">
         <div class="planner-grid" id="planner-grid"></div>
       </div>
+    </div>
+
+    <!-- VUE LISTE DE COURSES -->
+    <div id="view-shop" style="display:none">
+      <div class="main-topbar shop-topbar">
+        <h2>🛒 Liste de courses</h2>
+        <div class="shop-topbar-actions">
+          <button class="btn btn-sm btn-danger-ghost" onclick="deleteCheckedShopItems()">🗑️ Supprimer les cochés</button>
+          <button class="btn btn-sm btn-outline" onclick="openShopping()">+ Depuis recettes</button>
+        </div>
+      </div>
+      <div class="shop-add-row">
+        <input type="text" id="shop-add-input" placeholder="Ajouter un article…" autocomplete="off">
+        <button class="btn btn-primary" onclick="addShopItem()">Ajouter</button>
+      </div>
+      <div id="shop-items-list"></div>
     </div>
 
   </main>

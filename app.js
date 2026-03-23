@@ -66,6 +66,7 @@ let recipes        = [];
 let mealPlan       = {};
 let customCats     = [];   // [{ id, label, emoji }]
 let urlTodo        = [];   // [{ url, addedAt }] — URLs à importer plus tard
+let shopItems      = [];   // [{ id, name, checked }] — liste de courses persistante
 
 let activeCat      = 'all';
 let activeTag      = null;
@@ -166,6 +167,7 @@ function load() {
   try { mealPlan   = JSON.parse(localStorage.getItem('mes-repas')            || '{}'); } catch { mealPlan = {}; }
   try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
   try { urlTodo    = JSON.parse(localStorage.getItem('mes-urls-todo')         || '[]'); } catch { urlTodo = []; }
+  loadShopItems();
 
   // 2b) Charger les photos depuis Firestore en arrière-plan (sync multi-appareils)
   loadPhotosFromCloud();
@@ -1640,7 +1642,24 @@ function generateShoppingList() {
     });
     container.appendChild(group);
   });
-  showShopStep(2);
+  // Ajouter à la liste de courses persistante
+  const added = [];
+  items.forEach(item => {
+    const name = item.displayQty ? `${item.displayQty} ${item.name}` : item.name;
+    const exists = shopItems.some(x => x.name.toLowerCase() === name.toLowerCase());
+    if (!exists) { shopItems.push({ id: String(Date.now() + Math.random()), name, checked: false }); added.push(name); }
+  });
+  saveShopItems();
+
+  closeModal('ov-shop');
+  // Basculer sur la vue Courses
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.view === 'shop'));
+  document.getElementById('view-recipes').style.display = 'none';
+  document.getElementById('view-planner').style.display = 'none';
+  document.getElementById('view-shop').style.display = '';
+  currentView = 'shop';
+  renderShopView();
+  toast(`✓ ${added.length} article${added.length > 1 ? 's' : ''} ajouté${added.length > 1 ? 's' : ''} à la liste`);
 }
 
 // ── IMPORT ────────────────────────────────────────────
@@ -1868,7 +1887,10 @@ function initNav() {
       btn.classList.add('active');
       document.getElementById('view-recipes').style.display = currentView === 'recipes' ? '' : 'none';
       document.getElementById('view-planner').style.display = currentView === 'planner' ? '' : 'none';
-      if (currentView === 'planner') renderPlanner(); else render();
+      document.getElementById('view-shop').style.display    = currentView === 'shop'    ? '' : 'none';
+      if (currentView === 'planner') renderPlanner();
+      else if (currentView === 'shop') renderShopView();
+      else render();
     });
   });
   document.getElementById('planner-prev').addEventListener('click', () => { weekStart = addDays(weekStart, -7); renderPlanner(); });
@@ -2002,6 +2024,63 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#hbtn-more-wrap')) closeMoreMenu();
 });
 function openShop() { openShopping(); }
+
+// ── LISTE DE COURSES PERSISTANTE ──────────────────────
+function loadShopItems() {
+  try { shopItems = JSON.parse(localStorage.getItem('mes-courses') || '[]'); } catch { shopItems = []; }
+}
+function saveShopItems() {
+  try { localStorage.setItem('mes-courses', JSON.stringify(shopItems)); } catch(e) {}
+}
+function renderShopView() {
+  const el = document.getElementById('shop-items-list');
+  if (!el) return;
+  if (!shopItems.length) {
+    el.innerHTML = '<p class="shop-empty">Votre liste est vide.<br>Ajoutez des articles ou générez depuis vos recettes.</p>';
+    return;
+  }
+  const unchecked = shopItems.filter(x => !x.checked);
+  const checked   = shopItems.filter(x =>  x.checked);
+  const renderItem = item => `
+    <div class="shop-item-row${item.checked ? ' done' : ''}">
+      <input type="checkbox" id="shi-${item.id}" ${item.checked ? 'checked' : ''}
+             onchange="toggleShopItem('${item.id}')">
+      <label for="shi-${item.id}">${esc(item.name)}</label>
+      <button class="btn-remove-shop" onclick="removeShopItem('${item.id}')">✕</button>
+    </div>`;
+  el.innerHTML = unchecked.map(renderItem).join('') +
+    (checked.length ? `<div class="shop-done-sep">— Déjà dans le panier —</div>` + checked.map(renderItem).join('') : '');
+
+  // Enter sur le champ d'ajout
+  const inp = document.getElementById('shop-add-input');
+  if (inp && !inp._bound) {
+    inp._bound = true;
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') addShopItem(); });
+  }
+}
+function addShopItem() {
+  const inp = document.getElementById('shop-add-input');
+  const name = inp?.value.trim();
+  if (!name) return;
+  shopItems.push({ id: String(Date.now()), name, checked: false });
+  saveShopItems(); renderShopView();
+  inp.value = ''; inp.focus();
+}
+function toggleShopItem(id) {
+  const item = shopItems.find(x => x.id === id);
+  if (item) { item.checked = !item.checked; saveShopItems(); renderShopView(); }
+}
+function removeShopItem(id) {
+  shopItems = shopItems.filter(x => x.id !== id);
+  saveShopItems(); renderShopView();
+}
+function deleteCheckedShopItems() {
+  const nb = shopItems.filter(x => x.checked).length;
+  if (!nb) { toast('Aucun article coché.', 'error'); return; }
+  shopItems = shopItems.filter(x => !x.checked);
+  saveShopItems(); renderShopView();
+  toast(`${nb} article${nb > 1 ? 's' : ''} supprimé${nb > 1 ? 's' : ''}`);
+}
 
 // ── DATE DERNIÈRE RECETTE IMPORTÉE ────────────────────
 function renderLastImportDate() {
