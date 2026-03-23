@@ -224,13 +224,16 @@ function stripForCloud(arr) {
 }
 
 function save() {
-  // Migrer les photos base64 vers le store séparé (jamais perdu)
-  migratePhotosToStore(recipes);
-  // Cache local immédiat
-  localStorage.setItem('mes-recettes',          JSON.stringify(recipes));
-  localStorage.setItem('mes-repas',             JSON.stringify(mealPlan));
-  localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
-  // Sauvegarde Firebase (sans photos base64 — limite 1Mo)
+  // Cache local (peut échouer si localStorage plein — on continue quand même)
+  try {
+    const stripped = stripForCloud(recipes); // sans base64 pour économiser l'espace
+    localStorage.setItem('mes-recettes',          JSON.stringify(stripped));
+    localStorage.setItem('mes-repas',             JSON.stringify(mealPlan));
+    localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
+  } catch(e) {
+    console.warn('localStorage plein, sauvegarde Firebase uniquement');
+  }
+  // Sauvegarde Firebase (source de vérité)
   _ownWrite = true;
   STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
     .catch(e => { _ownWrite = false; console.warn('Firebase save:', e); });
