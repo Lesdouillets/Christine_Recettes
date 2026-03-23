@@ -1036,6 +1036,22 @@ async function generatePhotoForForm() {
   toast(isAI ? '✨ Photo IA générée pour « '+name+' » — cliquez pour une autre' : 'Photo trouvée — cliquez pour une autre');
 }
 
+// ── CLOUDINARY UPLOAD ──────────────────────────────────
+const CLOUDINARY_CLOUD = 'dorehsd97';
+const CLOUDINARY_PRESET = 'mes-recettes';
+
+async function uploadToCloudinary(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('upload_preset', CLOUDINARY_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
+    method: 'POST', body: fd
+  });
+  if (!res.ok) throw new Error('Cloudinary ' + res.status);
+  const data = await res.json();
+  return data.secure_url;
+}
+
 // Async: try TheMealDB → category fallback → keep SVG
 async function fetchAndSetRealPhoto(recipe, imgEl) {
   if (recipe.photo || _photoUrlCache[recipe.id]) return;
@@ -1514,39 +1530,18 @@ function initPhotoInputs() {
     const v = e.target.value.trim();
     if (v) showPhotoPreview(v); else hidePhotoPreview();
   });
-  document.getElementById('f-photo-file').addEventListener('change', e => {
+  document.getElementById('f-photo-file').addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const img = new Image();
-      img.onload = () => {
-        // Redimensionner
-        const canvas = document.createElement('canvas');
-        const max = 900; let w = img.width, h = img.height;
-        if (w > max || h > max) {
-          if (w > h) { h = Math.round(h * max / w); w = max; }
-          else       { w = Math.round(w * max / h); h = max; }
-        }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        // Afficher l'aperçu immédiatement
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-        showPhotoPreview(dataUrl);
-        // Stocker dans le store local ET dans Firestore (sync multi-appareils)
-        const recipeId = document.getElementById('f-id').value || uid();
-        document.getElementById('f-id').value = recipeId; // fixer l'ID
-        const map = loadPhotoStore();
-        map[recipeId] = dataUrl;
-        savePhotoStore(map);
-        document.getElementById('f-photo-url').value = dataUrl;
-        toast('⬆️ Sauvegarde de la photo…', 'info');
-        savePhotoToCloud(recipeId, dataUrl);
-        toast('✅ Photo sauvegardée (visible sur tous vos appareils) !');
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+    toast('⬆️ Upload en cours…', 'info');
+    try {
+      const url = await uploadToCloudinary(file);
+      showPhotoPreview(url);
+      document.getElementById('f-photo-url').value = url;
+      toast('✅ Photo uploadée !');
+    } catch(err) {
+      toast('Erreur upload photo : ' + err.message, 'error');
+    }
   });
 }
 
