@@ -186,31 +186,24 @@ function load() {
       return;
     }
 
-    const d        = snap.data();
-    const fbCount  = (d.recipes || []).length;
-    const lcCount  = recipes.filter(r => !String(r.id).startsWith('demo')).length;
+    const d       = snap.data();
+    const fbRecs  = d.recipes || [];
+    const lcCount = recipes.filter(r => !String(r.id).startsWith('demo')).length;
 
-    // Local prioritaire si : plus de recettes OU modification locale récente non encore sauvegardée
-    if (lcCount >= fbCount && lcCount > 0) {
-      // On a autant ou plus de recettes en local → on pousse vers Firebase
-      _ownWrite = true;
-      STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
-        .catch(() => { _ownWrite = false; });
+    // Premier chargement (localStorage vide) → charger Firebase
+    if (lcCount === 0) {
+      recipes    = mergePhotos(fbRecs);
+      mealPlan   = d.mealPlan   || {};
+      customCats = d.customCats || [];
+      try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
+      renderSidebar(); renderTagCloud(); renderCatSelect(); render();
       return;
     }
 
-    // Firebase a plus de recettes (ex: ajout depuis un autre appareil) → on recharge
-    if (fbCount > lcCount) {
-      recipes = mergePhotos(d.recipes || []);
-    }
-    mealPlan   = d.mealPlan   || {};
-    customCats = d.customCats || [];
-    // Cache local (sans photos — elles restent dans Firestore)
-    try { localStorage.setItem('mes-recettes',          JSON.stringify(recipes)); } catch(e) {}
-    try { localStorage.setItem('mes-repas',             JSON.stringify(mealPlan)); } catch(e) {}
-    try { localStorage.setItem('mes-categories-custom', JSON.stringify(customCats)); } catch(e) {}
-    // Re-rendre l'interface
-    renderSidebar(); renderTagCloud(); renderCatSelect(); render();
+    // Local a des données → il est autoritaire, on pousse vers Firebase
+    _ownWrite = true;
+    STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
+      .catch(() => { _ownWrite = false; });
   }, err => console.warn('Firebase sync:', err));
 }
 
@@ -620,11 +613,16 @@ function doTextImport() {
 
   status.innerHTML = `<div class="url-import-success">✓ ${ingredients.length} ingrédients extraits — « ${esc(name)} »</div>`;
   setTimeout(() => {
-    closeModal('ov-import');
-    openAddWithData({ name, ingredients, instructions: prepText, sourceUrl });
-    document.getElementById('import-text-input').value = '';
-    status.innerHTML = '';
-  }, 800);
+    try {
+      openAddWithData({ name, ingredients, instructions: prepText, sourceUrl });
+      closeModal('ov-import');
+      document.getElementById('import-text-input').value = '';
+      status.innerHTML = '';
+    } catch(e) {
+      status.innerHTML = `<div class="import-error">Erreur : ${e.message}</div>`;
+      console.error('doTextImport openAddWithData:', e);
+    }
+  }, 400);
 }
 
 async function doUrlImport() {
