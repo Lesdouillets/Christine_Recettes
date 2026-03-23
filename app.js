@@ -188,19 +188,21 @@ function load() {
 
     const d        = snap.data();
     const fbCount  = (d.recipes || []).length;
-    // Ne pas compter les recettes de démo dans le local
     const lcCount  = recipes.filter(r => !String(r.id).startsWith('demo')).length;
 
-    // Si localStorage a plus de vraies recettes que Firebase → priorité au local (migration)
-    if (lcCount > fbCount) {
+    // Local prioritaire si : plus de recettes OU modification locale récente non encore sauvegardée
+    if (lcCount >= fbCount && lcCount > 0) {
+      // On a autant ou plus de recettes en local → on pousse vers Firebase
       _ownWrite = true;
       STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
-        .then(() => toast(`✓ ${lcCount} recettes synchronisées`))
         .catch(() => { _ownWrite = false; });
       return;
     }
 
-    recipes    = mergePhotos(d.recipes || []);
+    // Firebase a plus de recettes (ex: ajout depuis un autre appareil) → on recharge
+    if (fbCount > lcCount) {
+      recipes = mergePhotos(d.recipes || []);
+    }
     mealPlan   = d.mealPlan   || {};
     customCats = d.customCats || [];
     // Cache local (sans photos — elles restent dans Firestore)
@@ -234,9 +236,10 @@ function save() {
     console.warn('localStorage plein, sauvegarde Firebase uniquement');
   }
   // Sauvegarde Firebase (source de vérité)
+  const payload = stripForCloud(recipes);
   _ownWrite = true;
-  STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
-    .catch(e => { _ownWrite = false; console.warn('Firebase save:', e); });
+  STORE.set({ recipes: payload, mealPlan, customCats })
+    .catch(e => { _ownWrite = false; toast('⚠️ Erreur synchro cloud : ' + e.message, 'error'); console.warn('Firebase save:', e); });
 }
 
 // ── CATÉGORIES ────────────────────────────────────────
@@ -565,8 +568,17 @@ function doTextImport() {
   const status = document.getElementById('text-import-status');
   if (!raw) { status.innerHTML = '<div class="import-error">Collez d\'abord le texte d\'une recette.</div>'; return; }
 
+  // Détecter URL en 1ère ligne
+  const lines0 = raw.split('\n');
+  let sourceUrl = '';
+  let rawBody = raw;
+  if (lines0[0] && /^https?:\/\//i.test(lines0[0].trim())) {
+    sourceUrl = lines0[0].trim();
+    rawBody = lines0.slice(1).join('\n').trim();
+  }
+
   // Nettoyer les tirets/puces en début de ligne
-  const cleanRaw = raw.split('\n').map(l => l.replace(/^[-–—•·*✓✗]\s*/, '')).join('\n');
+  const cleanRaw = rawBody.split('\n').map(l => l.replace(/^[-–—•·*✓✗]\s*/, '')).join('\n');
 
   // Découper par paragraphes (lignes vides)
   const paragraphs = cleanRaw.split(/\n[ \t]*\n/).map(p => p.trim()).filter(p => p.length > 0);
@@ -609,7 +621,7 @@ function doTextImport() {
   status.innerHTML = `<div class="url-import-success">✓ ${ingredients.length} ingrédients extraits — « ${esc(name)} »</div>`;
   setTimeout(() => {
     closeModal('ov-import');
-    openAddWithData({ name, ingredients, instructions: prepText });
+    openAddWithData({ name, ingredients, instructions: prepText, sourceUrl });
     document.getElementById('import-text-input').value = '';
     status.innerHTML = '';
   }, 800);
@@ -868,7 +880,7 @@ function openAddWithData(recipe) {
   document.getElementById('f-preptime').value     = recipe.prepTime || '';
   document.getElementById('f-cooktime').value     = recipe.cookTime  || '';
   document.getElementById('f-portions').value     = recipe.portions  || '';
-  document.getElementById('f-source-ref').value   = recipe.source?.ref  || '';
+  document.getElementById('f-source-ref').value   = recipe.sourceUrl || recipe.source?.ref  || '';
   document.getElementById('f-instructions').value = recipe.instructions || '';
   document.getElementById('f-notes').value        = recipe.notes        || '';
   document.getElementById('f-photo-url').value    = (recipe.photo && !recipe.photo.startsWith('data:')) ? recipe.photo : '';
