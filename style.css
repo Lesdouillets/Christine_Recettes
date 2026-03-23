@@ -921,16 +921,35 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .modal-wide { max-width: 100%; }
 }
 
-/* Bouton todo mobile : caché sur desktop */
-.hbtn-mobile-todo { display: none; }
-/* Boutons desktop-only */
+/* Visibilité par appareil */
+.hbtn-mobile-only { display: none; }
 .hbtn-desktop { display: flex; }
 
+/* Boutons secondaires : plus petits, moins contrastés */
+.hbtn-secondary {
+  opacity: 0.55;
+  font-size: 12px;
+  padding: 0 8px;
+  min-width: 0;
+}
+.hbtn-secondary:hover { opacity: 1; }
+.hbtn-secondary svg { width: 14px; height: 14px; }
+
+/* Date mise à jour dans le détail */
+.detail-updated {
+  font-size: 11px;
+  color: var(--text-3);
+  text-align: right;
+  padding: 8px 0 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
 @media (max-width: 768px) {
-  /* Cacher les boutons desktop-only sur tablette/mobile */
   .hbtn-desktop { display: none !important; }
-  /* Afficher le bouton 📌 À importer */
-  .hbtn-mobile-todo { display: flex; font-size: 18px; }
+  .hbtn-mobile-only { display: flex; }
+  /* Sur mobile, les boutons secondaires restent visibles mais petits */
+  .hbtn-secondary { opacity: 0.6; }
 }
 
 @media (max-width: 500px) {
@@ -941,8 +960,8 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .recipe-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .card-photo, .card-photo-placeholder { height: 130px; }
   .main { padding: 10px; }
-  /* Sur mobile : header = hamburger | search | 📌 | 🛒 | + */
-  .hbtn-mobile-todo { font-size: 20px; padding: 0 8px; }
-  /* Masquer le label "+ Recette" sur mobile (garder juste l'icône +) */
-  #add-btn .hbtn-label { display: none; }
+  /* Masquer label sur les boutons secondaires sur mobile */
+  .hbtn-secondary .hbtn-label { display: none; }
+  /* Masquer export/cloud/sync sur très petit écran */
+  #export-btn, #sync-btn, #load-cloud-btn { display: none !important; }
 }

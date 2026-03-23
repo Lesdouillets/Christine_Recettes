@@ -868,7 +868,6 @@ function openAddWithData(recipe) {
   document.getElementById('f-preptime').value     = recipe.prepTime || '';
   document.getElementById('f-cooktime').value     = recipe.cookTime  || '';
   document.getElementById('f-portions').value     = recipe.portions  || '';
-  document.getElementById('f-source-type').value  = recipe.source?.type || 'url';
   document.getElementById('f-source-ref').value   = recipe.source?.ref  || '';
   document.getElementById('f-instructions').value = recipe.instructions || '';
   document.getElementById('f-notes').value        = recipe.notes        || '';
@@ -1242,11 +1241,11 @@ function openDetail(id) {
 
   let srcHtml = '';
   if (r.source?.ref) {
-    const ico = { url:'🌐', instagram:'📱', livre:'📖', autre:'✏️' }[r.source.type] || '🔗';
-    if (r.source.type === 'url' || r.source.type === 'instagram')
-      srcHtml = `${ico} <a href="${esc(r.source.ref)}" target="_blank" rel="noopener">${esc(r.source.ref)}</a>`;
-    else
-      srcHtml = `${ico} ${esc(r.source.ref)}`;
+    const ref = r.source.ref.trim();
+    const isUrl = ref.startsWith('http');
+    srcHtml = isUrl
+      ? `🔗 <a href="${esc(ref)}" target="_blank" rel="noopener">${esc(ref)}</a>`
+      : `📖 ${esc(ref)}`;
   }
   document.getElementById('d-source').innerHTML = srcHtml;
   document.getElementById('d-times').textContent = [
@@ -1273,6 +1272,16 @@ function openDetail(id) {
     ns.style.display = '';
   } else {
     ns.style.display = 'none';
+  }
+
+  // Date de dernière mise à jour
+  const upd = document.getElementById('d-updated');
+  if (upd) {
+    const ts = r.updatedAt || r.dateAdded;
+    if (ts) {
+      const d = new Date(ts);
+      upd.textContent = `Mis à jour le ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}`;
+    } else { upd.textContent = ''; }
   }
 
   updateDetailCartBtn();
@@ -1308,7 +1317,6 @@ function openEdit(id) {
   document.getElementById('f-preptime').value     = r.prepTime || '';
   document.getElementById('f-cooktime').value     = r.cookTime  || '';
   document.getElementById('f-portions').value     = r.portions  || '';
-  document.getElementById('f-source-type').value  = r.source?.type || 'url';
   document.getElementById('f-source-ref').value   = r.source?.ref  || '';
   document.getElementById('f-instructions').value = r.instructions || '';
   document.getElementById('f-notes').value        = r.notes        || '';
@@ -1334,7 +1342,6 @@ function clearForm() {
     document.getElementById(id).value = '';
   });
   document.getElementById('f-cat').value = '';
-  document.getElementById('f-source-type').value = 'url';
   document.getElementById('f-photo-file').value  = '';
   setStarPicker(0);
   editTags = [];
@@ -1423,13 +1430,13 @@ function saveRecipe() {
     tags:      [...editTags],
     photo,
     source: {
-      type: document.getElementById('f-source-type').value,
-      ref:  document.getElementById('f-source-ref').value.trim(),
+      ref: document.getElementById('f-source-ref').value.trim(),
     },
     ingredients:  gatherIngredients(),
     instructions: document.getElementById('f-instructions').value.trim(),
     notes:        document.getElementById('f-notes').value.trim(),
     dateAdded:    idx >= 0 ? recipes[idx].dateAdded : new Date().toISOString(),
+    updatedAt:    new Date().toISOString(),
   };
 
   // Vérification doublon uniquement pour les nouvelles recettes
