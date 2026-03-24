@@ -66,7 +66,10 @@ let recipes        = [];
 let mealPlan       = {};
 let customCats     = [];   // [{ id, label, emoji }]
 let urlTodo        = [];   // [{ url, addedAt }] — URLs à importer plus tard
-let shopItems      = [];   // [{ id, name, checked }] — liste de courses persistante
+let shopItems      = [];   // [{ id, name, aisle, checked }] — liste de courses persistante
+let todoItems      = [];   // [{ id, title, assignee, done, createdAt }] — to-do partagée
+let todoFilter     = 'all';
+let todoAssignee   = 'nous';
 
 let activeCat      = 'all';
 let activeTag      = null;
@@ -168,6 +171,8 @@ function load() {
   try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
   try { urlTodo    = JSON.parse(localStorage.getItem('mes-urls-todo')         || '[]'); } catch { urlTodo = []; }
   loadShopItems();
+  loadTodoItems();
+  initTodoSync();
 
   // 2b) Charger les photos depuis Firestore en arrière-plan (sync multi-appareils)
   loadPhotosFromCloud();
@@ -1888,8 +1893,10 @@ function initNav() {
       document.getElementById('view-recipes').style.display = currentView === 'recipes' ? '' : 'none';
       document.getElementById('view-planner').style.display = currentView === 'planner' ? '' : 'none';
       document.getElementById('view-shop').style.display    = currentView === 'shop'    ? '' : 'none';
+      document.getElementById('view-todo').style.display    = currentView === 'todo'    ? '' : 'none';
       if (currentView === 'planner') renderPlanner();
       else if (currentView === 'shop') renderShopView();
+      else if (currentView === 'todo') renderTodoView();
       else render();
     });
   });
@@ -2032,15 +2039,31 @@ function loadShopItems() {
 function saveShopItems() {
   try { localStorage.setItem('mes-courses', JSON.stringify(shopItems)); } catch(e) {}
 }
+function initShopAisleSelect() {
+  const sel = document.getElementById('shop-add-aisle');
+  if (!sel || sel.children.length > 1) return;
+  AISLES.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.id; opt.textContent = `${a.emoji} ${a.label}`;
+    sel.appendChild(opt);
+  });
+}
 function renderShopView() {
+  initShopAisleSelect();
   const el = document.getElementById('shop-items-list');
   if (!el) return;
   if (!shopItems.length) {
     el.innerHTML = '<p class="shop-empty">Votre liste est vide.<br>Ajoutez des articles ou générez depuis vos recettes.</p>';
     return;
   }
-  const unchecked = shopItems.filter(x => !x.checked);
-  const checked   = shopItems.filter(x =>  x.checked);
+  // Grouper par rayon
+  const groups = {};
+  AISLES.forEach(a => { groups[a.id] = []; });
+  shopItems.filter(x => !x.checked).forEach(x => {
+    const k = groups[x.aisle] ? x.aisle : 'autre';
+    groups[k].push(x);
+  });
+  const checked = shopItems.filter(x => x.checked);
   const renderItem = item => `
     <div class="shop-item-row${item.checked ? ' done' : ''}">
       <input type="checkbox" id="shi-${item.id}" ${item.checked ? 'checked' : ''}
@@ -2048,10 +2071,20 @@ function renderShopView() {
       <label for="shi-${item.id}">${esc(item.name)}</label>
       <button class="btn-remove-shop" onclick="removeShopItem('${item.id}')">✕</button>
     </div>`;
-  el.innerHTML = unchecked.map(renderItem).join('') +
-    (checked.length ? `<div class="shop-done-sep">— Déjà dans le panier —</div>` + checked.map(renderItem).join('') : '');
-
-  // Enter sur le champ d'ajout
+  let html = '';
+  AISLES.forEach(a => {
+    const list = groups[a.id];
+    if (!list.length) return;
+    html += `<div class="shop-aisle-section">
+      <div class="shop-aisle-title">${a.emoji} ${a.label} <span class="shop-aisle-count">${list.length}</span></div>
+      ${list.map(renderItem).join('')}
+    </div>`;
+  });
+  if (checked.length) {
+    html += `<div class="shop-done-sep">— ${checked.length} article${checked.length>1?'s':''} dans le panier —</div>`;
+    html += checked.map(renderItem).join('');
+  }
+  el.innerHTML = html;
   const inp = document.getElementById('shop-add-input');
   if (inp && !inp._bound) {
     inp._bound = true;
@@ -2062,7 +2095,9 @@ function addShopItem() {
   const inp = document.getElementById('shop-add-input');
   const name = inp?.value.trim();
   if (!name) return;
-  shopItems.push({ id: String(Date.now()), name, checked: false });
+  const selAisle = document.getElementById('shop-add-aisle')?.value;
+  const aisle = (selAisle === 'auto' || !selAisle) ? guessAisle(name) : selAisle;
+  shopItems.push({ id: String(Date.now()), name, aisle, checked: false });
   saveShopItems(); renderShopView();
   inp.value = ''; inp.focus();
 }
@@ -2080,6 +2115,88 @@ function deleteCheckedShopItems() {
   shopItems = shopItems.filter(x => !x.checked);
   saveShopItems(); renderShopView();
   toast(`${nb} article${nb > 1 ? 's' : ''} supprimé${nb > 1 ? 's' : ''}`);
+}
+
+// ── TO-DO PARTAGÉE Li / Lou / Nous ────────────────────
+const TODO_STORE = db.collection('data').doc('todos');
+const ASSIGNEES = {
+  li:   { label: 'Li',   emoji: '💜', color: '#8b5cf6' },
+  lou:  { label: 'Lou',  emoji: '💙', color: '#3b82f6' },
+  nous: { label: 'Nous', emoji: '🤝', color: '#10b981' },
+};
+function loadTodoItems() {
+  try { todoItems = JSON.parse(localStorage.getItem('mes-todo') || '[]'); } catch { todoItems = []; }
+}
+function saveTodoItems() {
+  try { localStorage.setItem('mes-todo', JSON.stringify(todoItems)); } catch(e) {}
+  TODO_STORE.set({ todos: todoItems }).catch(e => console.warn('todo sync:', e));
+}
+function initTodoSync() {
+  TODO_STORE.onSnapshot(snap => {
+    if (!snap.exists) return;
+    const remote = snap.data().todos || [];
+    if (remote.length >= todoItems.length) {
+      todoItems = remote;
+      try { localStorage.setItem('mes-todo', JSON.stringify(todoItems)); } catch(e) {}
+      if (currentView === 'todo') renderTodoView();
+    }
+  }, () => {});
+}
+function renderTodoView() {
+  const el = document.getElementById('todo-items-list');
+  if (!el) return;
+  const filtered = todoFilter === 'all' ? todoItems : todoItems.filter(x => x.assignee === todoFilter);
+  const undone = filtered.filter(x => !x.done);
+  const done   = filtered.filter(x =>  x.done);
+  const renderTask = t => {
+    const a = ASSIGNEES[t.assignee] || ASSIGNEES.nous;
+    return `<div class="todo-task${t.done ? ' done' : ''}" style="--task-color:${a.color}">
+      <input type="checkbox" id="tdi-${t.id}" ${t.done ? 'checked' : ''} onchange="toggleTodoItem('${t.id}')">
+      <label for="tdi-${t.id}">${esc(t.title)}</label>
+      <span class="todo-badge">${a.emoji} ${a.label}</span>
+      <button class="btn-remove-shop" onclick="removeTodoItem('${t.id}')">✕</button>
+    </div>`;
+  };
+  el.innerHTML = undone.length || done.length
+    ? undone.map(renderTask).join('') +
+      (done.length ? `<div class="shop-done-sep">— ${done.length} tâche${done.length>1?'s':''} terminée${done.length>1?'s':''} —</div>` + done.map(renderTask).join('') : '')
+    : '<p class="shop-empty">Aucune tâche ici.<br>Ajoutez-en une ci-dessus !</p>';
+}
+function addTodoItem() {
+  const inp = document.getElementById('todo-add-input');
+  const title = inp?.value.trim();
+  if (!title) return;
+  todoItems.unshift({ id: String(Date.now()), title, assignee: todoAssignee, done: false, createdAt: Date.now() });
+  saveTodoItems(); renderTodoView();
+  inp.value = ''; inp.focus();
+}
+function toggleTodoItem(id) {
+  const t = todoItems.find(x => x.id === id);
+  if (t) { t.done = !t.done; saveTodoItems(); renderTodoView(); }
+}
+function removeTodoItem(id) {
+  todoItems = todoItems.filter(x => x.id !== id);
+  saveTodoItems(); renderTodoView();
+}
+function initTodoUI() {
+  // Filtres
+  document.querySelectorAll('.todo-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      todoFilter = btn.dataset.filter;
+      document.querySelectorAll('.todo-filter').forEach(b => b.classList.toggle('active', b === btn));
+      renderTodoView();
+    });
+  });
+  // Boutons assignee
+  document.querySelectorAll('.todo-assign-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      todoAssignee = btn.dataset.assign;
+      document.querySelectorAll('.todo-assign-btn').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+  // Enter
+  const inp = document.getElementById('todo-add-input');
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') addTodoItem(); });
 }
 
 // ── DATE DERNIÈRE RECETTE IMPORTÉE ────────────────────
@@ -2180,6 +2297,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTagInput();
   initPhotoInputs();
   initImportTabs();
+  initTodoUI();
   renderCatSelect();
   render();
 });

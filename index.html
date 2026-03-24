@@ -34,6 +34,7 @@
     <button class="nav-tab active" data-view="recipes">Recettes</button>
     <button class="nav-tab" data-view="planner">Planning</button>
     <button class="nav-tab" data-view="shop">🛒 Courses</button>
+    <button class="nav-tab" data-view="todo">✅ To-do</button>
   </nav>
 
   <div class="header-search">
@@ -162,15 +163,41 @@
       <div class="main-topbar shop-topbar">
         <h2>🛒 Liste de courses</h2>
         <div class="shop-topbar-actions">
-          <button class="btn btn-sm btn-danger-ghost" onclick="deleteCheckedShopItems()">🗑️ Supprimer les cochés</button>
-          <button class="btn btn-sm btn-outline" onclick="openShopping()">+ Depuis recettes</button>
+          <button class="btn btn-sm btn-danger-ghost" onclick="deleteCheckedShopItems()">🗑️ Cochés</button>
+          <button class="btn btn-sm btn-outline" onclick="openShopping()">📋 Depuis recettes</button>
         </div>
       </div>
       <div class="shop-add-row">
         <input type="text" id="shop-add-input" placeholder="Ajouter un article…" autocomplete="off">
+        <select id="shop-add-aisle" class="shop-aisle-select">
+          <option value="auto">🔍 Auto</option>
+        </select>
         <button class="btn btn-primary" onclick="addShopItem()">Ajouter</button>
       </div>
       <div id="shop-items-list"></div>
+    </div>
+
+    <!-- VUE TO-DO PARTAGÉE -->
+    <div id="view-todo" style="display:none">
+      <div class="main-topbar todo-topbar">
+        <h2>✅ To-do</h2>
+        <div class="todo-filter-tabs">
+          <button class="todo-filter active" data-filter="all">Tout</button>
+          <button class="todo-filter" data-filter="li">💜 Li</button>
+          <button class="todo-filter" data-filter="lou">💙 Lou</button>
+          <button class="todo-filter" data-filter="nous">🤝 Nous</button>
+        </div>
+      </div>
+      <div class="todo-add-form">
+        <input type="text" id="todo-add-input" placeholder="Nouvelle tâche…" autocomplete="off">
+        <div class="todo-assignee-btns">
+          <button class="todo-assign-btn active" data-assign="nous">🤝 Nous</button>
+          <button class="todo-assign-btn" data-assign="li">💜 Li</button>
+          <button class="todo-assign-btn" data-assign="lou">💙 Lou</button>
+        </div>
+        <button class="btn btn-primary" onclick="addTodoItem()">Ajouter</button>
+      </div>
+      <div id="todo-items-list"></div>
     </div>
 
   </main>
