@@ -66,7 +66,8 @@ let recipes        = [];
 let mealPlan       = {};
 let customCats     = [];   // [{ id, label, emoji }]
 let urlTodo        = [];   // [{ url, addedAt }] — URLs à importer plus tard
-let shopItems      = [];   // [{ id, name, aisle, checked }] — liste de courses persistante
+let shopItems        = [];   // [{ id, name, aisle, checked }] — liste de courses persistante
+let _localModifiedAt = 0;  // timestamp dernière modif locale
 let todoItems      = [];   // [{ id, title, assignee, done, createdAt }] — to-do partagée
 let todoFilter     = 'all';
 let todoAssignee   = 'nous';
@@ -193,11 +194,12 @@ function load() {
       return;
     }
 
-    const d       = snap.data();
-    const fbRecs  = d.recipes || [];
-    const lcCount = recipes.filter(r => !String(r.id).startsWith('demo')).length;
+    const d          = snap.data();
+    const fbRecs     = d.recipes || [];
+    const fbModified = d.lastModified || 0;
+    const lcCount    = recipes.filter(r => !String(r.id).startsWith('demo')).length;
 
-    // Premier chargement (localStorage vide) → charger Firebase
+    // Premier chargement (localStorage vide) → toujours charger Firebase
     if (lcCount === 0) {
       recipes    = mergePhotos(fbRecs);
       mealPlan   = d.mealPlan   || {};
@@ -207,10 +209,20 @@ function load() {
       return;
     }
 
-    // Local a des données → il est autoritaire, on pousse vers Firebase
-    _ownWrite = true;
-    STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
-      .catch(() => { _ownWrite = false; });
+    // Comparer les timestamps : le plus récent gagne
+    if (_localModifiedAt > fbModified) {
+      // Local plus récent → pousser vers Firebase
+      _ownWrite = true;
+      STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats, lastModified: _localModifiedAt })
+        .catch(() => { _ownWrite = false; });
+    } else {
+      // Firebase plus récent (autre appareil) → charger depuis Firebase
+      recipes    = mergePhotos(fbRecs);
+      mealPlan   = d.mealPlan   || {};
+      customCats = d.customCats || [];
+      try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
+      renderSidebar(); renderTagCloud(); renderCatSelect(); render();
+    }
   }, err => console.warn('Firebase sync:', err));
 }
 
@@ -236,9 +248,10 @@ function save() {
     console.warn('localStorage plein, sauvegarde Firebase uniquement');
   }
   // Sauvegarde Firebase (source de vérité)
+  _localModifiedAt = Date.now();
   const payload = stripForCloud(recipes);
   _ownWrite = true;
-  STORE.set({ recipes: payload, mealPlan, customCats })
+  STORE.set({ recipes: payload, mealPlan, customCats, lastModified: _localModifiedAt })
     .catch(e => { _ownWrite = false; toast('⚠️ Erreur synchro cloud : ' + e.message, 'error'); console.warn('Firebase save:', e); });
 }
 
@@ -1932,7 +1945,12 @@ function initMobileSidebar() {
       document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.view === view));
       document.getElementById('view-recipes').style.display = view === 'recipes' ? '' : 'none';
       document.getElementById('view-planner').style.display = view === 'planner' ? '' : 'none';
-      if (view === 'planner') renderPlanner(); else render();
+      document.getElementById('view-shop').style.display    = view === 'shop'    ? '' : 'none';
+      document.getElementById('view-todo').style.display    = view === 'todo'    ? '' : 'none';
+      if (view === 'planner') renderPlanner();
+      else if (view === 'shop') renderShopView();
+      else if (view === 'todo') renderTodoView();
+      else render();
       closeSidebarFn();
     });
   });
