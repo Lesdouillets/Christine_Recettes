@@ -209,6 +209,17 @@ function load() {
       return;
     }
 
+    // Sécurité : ne jamais écraser Firebase si local a beaucoup moins de recettes
+    // (évite que 3 recettes démo écrasent 200+ recettes Firebase)
+    if (lcCount < fbRecs.length * 0.5 && fbRecs.length > 10) {
+      recipes    = mergePhotos(fbRecs);
+      mealPlan   = d.mealPlan   || {};
+      customCats = d.customCats || [];
+      try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
+      renderSidebar(); renderTagCloud(); renderCatSelect(); render();
+      return;
+    }
+
     // Comparer timestamps puis nombre de recettes
     const localWins = _localModifiedAt > fbModified || (_localModifiedAt === fbModified && lcCount > fbRecs.length);
     if (localWins) {
