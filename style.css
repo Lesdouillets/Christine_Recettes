@@ -93,9 +93,10 @@ button { font-family: inherit; cursor: pointer; }
   display: flex; gap: 2px; flex-shrink: 0;
 }
 .nav-tab {
-  padding: 6px 14px; border-radius: 20px; border: none;
+  padding: 6px 12px; border-radius: 20px; border: none;
   font-size: 13px; font-weight: 500; color: var(--text-3);
   background: transparent; transition: all var(--transition);
+  white-space: nowrap;
 }
 .nav-tab:hover { background: var(--bg); color: var(--text-2); }
 .nav-tab.active { background: var(--primary-bg); color: var(--primary); }
@@ -902,6 +903,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 
   .header-nav { display: none; }
   .sidebar-mobile-nav { display: block; }
+  .hamburger { display: flex; }
 
   .header-search { max-width: 200px; }
 
