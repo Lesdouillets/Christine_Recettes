@@ -209,9 +209,11 @@ function load() {
       return;
     }
 
-    // Comparer les timestamps : le plus récent gagne
-    if (_localModifiedAt > fbModified) {
-      // Local plus récent → pousser vers Firebase
+    // Comparer timestamps puis nombre de recettes
+    const localWins = _localModifiedAt > fbModified || (_localModifiedAt === fbModified && lcCount > fbRecs.length);
+    if (localWins) {
+      // Local plus récent ou plus complet → pousser vers Firebase
+      _localModifiedAt = _localModifiedAt || Date.now();
       _ownWrite = true;
       STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats, lastModified: _localModifiedAt })
         .catch(() => { _ownWrite = false; });
