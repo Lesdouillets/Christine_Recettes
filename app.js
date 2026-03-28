@@ -174,6 +174,7 @@ function load() {
   loadShopItems();
   loadTodoItems();
   initTodoSync();
+  initUrlTodoSync();
 
   // 2b) Charger les photos depuis Firestore en arrière-plan (sync multi-appareils)
   loadPhotosFromCloud();
@@ -516,8 +517,28 @@ function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 // ── URL TODO LIST ─────────────────────────────────────
+const URL_TODO_STORE = db.collection('data').doc('url-todo');
+
 function saveUrlTodo() {
-  localStorage.setItem('mes-urls-todo', JSON.stringify(urlTodo));
+  try { localStorage.setItem('mes-urls-todo', JSON.stringify(urlTodo)); } catch(e) {}
+  URL_TODO_STORE.set({ urls: urlTodo }).catch(e => console.warn('url-todo sync:', e));
+}
+
+function initUrlTodoSync() {
+  URL_TODO_STORE.onSnapshot(snap => {
+    if (!snap.exists) return;
+    const remote = snap.data().urls || [];
+    // Fusionner : garder les URLs locales + distantes (union par URL)
+    const merged = [...urlTodo];
+    remote.forEach(r => {
+      if (!merged.find(l => l.url === r.url)) merged.push(r);
+    });
+    if (merged.length !== urlTodo.length) {
+      urlTodo = merged;
+      try { localStorage.setItem('mes-urls-todo', JSON.stringify(urlTodo)); } catch(e) {}
+      renderUrlTodo();
+    }
+  }, () => {});
 }
 
 function addToUrlTodo() {
@@ -1583,6 +1604,8 @@ function initPhotoInputs() {
   document.getElementById('f-photo-file').addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
+    const saveBtn = document.getElementById('save-recipe-btn');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⬆️ Upload…'; }
     toast('⬆️ Upload en cours…', 'info');
     try {
       const url = await uploadToCloudinary(file);
@@ -1591,6 +1614,8 @@ function initPhotoInputs() {
       toast('✅ Photo uploadée !');
     } catch(err) {
       toast('Erreur upload photo : ' + err.message, 'error');
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Enregistrer'; }
     }
   });
 }
