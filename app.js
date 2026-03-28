@@ -226,7 +226,10 @@ function load() {
     }
 
     // Comparer timestamps puis nombre de recettes
-    const localWins = _localModifiedAt > fbModified || (_localModifiedAt === fbModified && lcCount > fbRecs.length);
+    // Cas spécial : local a beaucoup plus de recettes que Firebase → local gagne toujours
+    // (protège si Firebase se fait écraser par 3 démos alors que local a 200+)
+    const localHasMore = lcCount > fbRecs.length * 2 && lcCount > 10;
+    const localWins = localHasMore || _localModifiedAt > fbModified || (_localModifiedAt === fbModified && lcCount > fbRecs.length);
     if (localWins) {
       // Local plus récent ou plus complet → pousser vers Firebase
       _localModifiedAt = _localModifiedAt || Date.now();
