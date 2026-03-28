@@ -923,6 +923,17 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .modal-wide { max-width: 100%; }
 }
 
+/* ── MODE LECTURE (masque tout ce qui permet d'éditer) ─ */
+.lecture-mode #add-btn,
+.lecture-mode #import-btn,
+.lecture-mode #text-import-btn,
+.lecture-mode #mobile-import-btn,
+.lecture-mode [data-view="todo"],
+.lecture-mode [data-mobile-view="todo"],
+.lecture-mode #view-todo,
+.lecture-mode .card-del-btn,
+.lecture-mode [onclick="editDetailRecipe()"] { display: none !important; }
+
 /* Visibilité par appareil */
 .hbtn-mobile-only { display: none; }
 .hbtn-desktop { display: flex; }

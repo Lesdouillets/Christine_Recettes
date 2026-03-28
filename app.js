@@ -61,6 +61,10 @@ const STORE   = db.collection('data').doc('main');
 const PHOTOS  = db.collection('photos'); // chaque doc = { photo: "data:..." } pour un recipeId
 let _ownWrite = false; // évite re-render inutile sur notre propre écriture
 
+// ── MODE LECTURE ───────────────────────────────────────
+const LECTURE_MODE = new URLSearchParams(location.search).get('mode') === 'lecture';
+if (LECTURE_MODE) document.documentElement.classList.add('lecture-mode');
+
 // ── ÉTAT ──────────────────────────────────────────────
 let recipes        = [];
 let mealPlan       = {};
@@ -1361,6 +1365,7 @@ function editDetailRecipe() {
 let editTags = [];
 
 function openAdd() {
+  if (LECTURE_MODE) return;
   document.getElementById('edit-modal-title').textContent = 'Nouvelle recette';
   document.getElementById('edit-del-btn').style.display = 'none';
   renderCatSelect();
@@ -1369,6 +1374,7 @@ function openAdd() {
 }
 
 function openEdit(id) {
+  if (LECTURE_MODE) return;
   const r = recipes.find(x => x.id === id);
   if (!r) return;
   document.getElementById('edit-modal-title').textContent = 'Modifier la recette';
