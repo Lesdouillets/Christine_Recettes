@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Réparation photos</title>
+<title>Reset base recettes</title>
 <style>
   body { font-family: sans-serif; padding: 2rem; max-width: 700px; margin: auto; }
   button { background: #f97316; color: white; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 8px; cursor: pointer; margin-bottom: 0.5rem; }
@@ -12,11 +12,11 @@
 </style>
 </head>
 <body>
-<h2>🔧 Réparation complète</h2>
-<p>Sélectionne l'export JSON du 28 mars, puis lance la réparation.</p>
+<h2>🔄 Remise à zéro depuis l'export JSON</h2>
+<p>Sélectionne ton export JSON du 28 mars, puis lance la réinitialisation.</p>
 <input type="file" id="jsonFile" accept=".json">
 <br>
-<button id="btn" onclick="run()" disabled>🔧 Réparer</button>
+<button id="btn" onclick="run()" disabled>🚀 Réinitialiser depuis l'export</button>
 <div id="log">En attente du fichier JSON...</div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -64,18 +64,10 @@ function normalize(name) {
 async function run() {
   const btn = document.getElementById('btn');
   btn.disabled = true;
-  log('\n⏳ Lecture de mealPlan et customCats depuis Firebase...');
 
   try {
-    // ── 1. Lire UNIQUEMENT mealPlan + customCats depuis Firebase ──
-    const snap = await STORE.get();
-    const d = snap.data() || {};
-    const mealPlan   = d.mealPlan   || {};
-    const customCats = d.customCats || [];
-    log(`✅ mealPlan et customCats récupérés`);
-
-    // ── 2. Dédupliquer l'export par nom (garder la plus récente) ──
-    log(`\n⏳ Déduplication de l'export...`);
+    // ── 1. Dédupliquer l'export par nom ──
+    log('⏳ Déduplication...');
     const map = new Map();
     for (const r of exportData) {
       const key = normalize(r.name);
@@ -84,70 +76,88 @@ async function run() {
       if (!existing) {
         map.set(key, r);
       } else {
-        const tsExisting = existing.updatedAt || existing.createdAt || 0;
-        const tsThis     = r.updatedAt || r.createdAt || 0;
-        // Préférer la version avec photo Cloudinary si disponible
-        const existingHasUrl = existing.photo && existing.photo.startsWith('http');
-        const thisHasUrl     = r.photo && r.photo.startsWith('http');
-        if (thisHasUrl && !existingHasUrl) {
-          map.set(key, r);
-        } else if (!existingHasUrl && !thisHasUrl && tsThis > tsExisting) {
-          map.set(key, r);
-        } else if (existingHasUrl && !thisHasUrl) {
-          // garder existing
-        } else if (tsThis > tsExisting) {
-          map.set(key, r);
-        }
+        const hasUrl     = r.photo        && r.photo.startsWith('http');
+        const existHasUrl = existing.photo && existing.photo.startsWith('http');
+        const tsNew      = r.updatedAt        || r.createdAt        || 0;
+        const tsExist    = existing.updatedAt || existing.createdAt || 0;
+        // Priorité : avoir une URL Cloudinary > être plus récent
+        if (hasUrl && !existHasUrl) map.set(key, r);
+        else if (!hasUrl && !existHasUrl && tsNew > tsExist) map.set(key, r);
+        else if (hasUrl && existHasUrl && tsNew > tsExist) map.set(key, r);
       }
     }
+
     const deduped = Array.from(map.values());
     log(`✅ ${deduped.length} recettes uniques`);
 
-    // ── 3. Nettoyer les photos : garder URL Cloudinary, supprimer base64 ──
-    log(`\n⏳ Nettoyage des photos...`);
-    let urlOk = 0, base64Removed = 0, noPhoto = 0;
+    // ── 2. Nettoyer les photos : garder uniquement les URLs Cloudinary ──
+    log('⏳ Nettoyage des photos...');
+    let urlOk = 0, base64Dropped = 0, noPhoto = 0;
+
     const cleanRecipes = deduped.map(r => {
-      const { photo, ...rest } = r;
-      if (photo && photo.startsWith('http')) {
+      // On ne garde que les champs utiles, sans base64
+      const clean = {
+        id:           r.id,
+        name:         r.name,
+        category:     r.category,
+        tags:         r.tags,
+        ingredients:  r.ingredients,
+        instructions: r.instructions,
+        portions:     r.portions,
+        prepTime:     r.prepTime,
+        cookTime:     r.cookTime,
+        source:       r.source,
+        notes:        r.notes,
+        createdAt:    r.createdAt,
+        updatedAt:    r.updatedAt,
+        dateAdded:    r.dateAdded,
+      };
+      // Supprimer les clés undefined
+      Object.keys(clean).forEach(k => clean[k] === undefined && delete clean[k]);
+
+      if (r.photo && r.photo.startsWith('http')) {
+        clean.photo = r.photo;
         urlOk++;
-        return { ...rest, photo };
-      } else if (photo && photo.startsWith('data:')) {
-        base64Removed++;
-        return rest; // on supprime le base64 (trop lourd pour Firebase)
+      } else if (r.photo && r.photo.startsWith('data:')) {
+        base64Dropped++;
+        // On ne met pas la photo — elle sera chargée depuis la collection photos/
       } else {
         noPhoto++;
-        return rest;
       }
+      return clean;
     });
 
-    log(`  ✅ ${urlOk} photos Cloudinary conservées`);
-    log(`  🗑️  ${base64Removed} photos base64 supprimées (trop lourdes)`);
-    log(`  ⚪ ${noPhoto} recettes sans photo`);
+    log(`  ✅ ${urlOk} photos Cloudinary`);
+    log(`  🗑️  ${base64Dropped} photos base64 supprimées`);
+    log(`  ⚪ ${noPhoto} sans photo`);
 
-    // ── 4. Vérifier la taille ──
+    // ── 3. Construire le document final (sans lire Firebase pour les recettes) ──
+    const now = Date.now();
     const toWrite = {
       recipes:    cleanRecipes,
-      mealPlan,
-      customCats,
-      modifiedAt: Date.now(),
-      resetAt:    Date.now()
+      mealPlan:   {},   // remise à zéro propre
+      customCats: [],
+      modifiedAt: now,
+      resetAt:    now,
     };
-    const size = JSON.stringify(toWrite).length;
-    log(`\n📏 Taille du document à écrire : ${Math.round(size / 1024)} KB`);
 
-    if (size > 950000) {
-      log('⚠️  Encore trop grand ! Abandon.');
+    const sizeKB = Math.round(JSON.stringify(toWrite).length / 1024);
+    log(`\n📏 Taille du document : ${sizeKB} KB (limite : 1024 KB)`);
+
+    if (sizeKB > 950) {
+      log('❌ Document encore trop grand. Impossible d\'écrire.');
       btn.disabled = false;
       return;
     }
 
-    // ── 5. Écrire dans Firebase ──
-    log(`\n⏳ Écriture dans Firebase...`);
+    // ── 4. Écrire dans Firebase ──
+    log('⏳ Écriture dans Firebase...');
     await STORE.set(toWrite);
 
-    log(`✅ Firebase mis à jour !`);
-    log(`🔄 Force-sync déclenché → tous les appareils vont se mettre à jour`);
-    log(`\n🎉 Terminé ! Recharge l'application.`);
+    log('✅ Firebase réinitialisé !');
+    log('🔄 Force-sync déclenché → tous les appareils vont recharger');
+    log('\n⚠️  Note : le planning (mealPlan) a été remis à zéro.');
+    log('🎉 Terminé ! Recharge l\'application sur tous tes appareils.');
 
   } catch(e) {
     log('❌ Erreur : ' + e.message);

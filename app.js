@@ -284,8 +284,10 @@ function save() {
   // Sauvegarde Firebase (source de vérité)
   _localModifiedAt = Date.now();
   const payload = stripForCloud(recipes);
+  // Conserver le resetAt existant pour ne pas casser le mécanisme de force-sync
+  const savedResetAt = parseInt(localStorage.getItem('_resetAt') || '0');
   _ownWrite = true;
-  STORE.set({ recipes: payload, mealPlan, customCats, lastModified: _localModifiedAt })
+  STORE.set({ recipes: payload, mealPlan, customCats, lastModified: _localModifiedAt, ...(savedResetAt ? { resetAt: savedResetAt } : {}) })
     .catch(e => { _ownWrite = false; toast('⚠️ Erreur synchro cloud : ' + e.message, 'error'); console.warn('Firebase save:', e); });
 }
 
