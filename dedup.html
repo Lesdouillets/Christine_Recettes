@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Déduplication recettes</title>
+<style>
+  body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
+  button { background: #f97316; color: white; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 8px; cursor: pointer; }
+  button:disabled { background: #ccc; cursor: default; }
+  #log { margin-top: 1rem; background: #f5f5f5; padding: 1rem; border-radius: 8px; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<h2>🔧 Déduplication des recettes</h2>
+<p>Cet outil va :</p>
+<ol>
+  <li>Lire toutes les recettes depuis Firebase</li>
+  <li>Supprimer les doublons (même nom → garde la plus récente)</li>
+  <li>Forcer la synchronisation sur tous les appareils</li>
+</ol>
+<button id="btn" onclick="run()">Lancer la déduplication</button>
+<div id="log">En attente...</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:            "AIzaSyB-vaVqrejkRAiW5q3sQvy9crl5RzDeIzc",
+  authDomain:        "mes-recettes-bd049.firebaseapp.com",
+  projectId:         "mes-recettes-bd049",
+  storageBucket:     "mes-recettes-bd049.firebasestorage.app",
+  messagingSenderId: "239169207922",
+  appId:             "1:239169207922:web:1b3d67548cc7bbd8ad0ceb"
+});
+const db = firebase.firestore();
+const STORE = db.collection('data').doc('main');
+
+function log(msg) {
+  document.getElementById('log').textContent += '\n' + msg;
+}
+
+async function run() {
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  document.getElementById('log').textContent = '⏳ Lecture Firebase...';
+
+  try {
+    const snap = await STORE.get();
+    const d = snap.data() || {};
+    const recipes = d.recipes || [];
+    log(`📦 ${recipes.length} recettes trouvées dans Firebase`);
+
+    // Dédupliquer par nom (insensible à la casse), garder la plus récente
+    const map = new Map();
+    for (const r of recipes) {
+      const key = (r.name || '').toLowerCase().trim();
+      if (!key) continue;
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, r);
+      } else {
+        const existingTs = existing.updatedAt || existing.createdAt || 0;
+        const thisTs = r.updatedAt || r.createdAt || 0;
+        if (thisTs > existingTs) {
+          map.set(key, r);
+        }
+      }
+    }
+
+    const deduped = Array.from(map.values());
+    log(`✅ Après déduplication : ${deduped.length} recettes uniques`);
+    log(`🗑️  Supprimés : ${recipes.length - deduped.length} doublons`);
+
+    if (deduped.length === recipes.length) {
+      log('\n⚠️  Aucun doublon détecté. Annulation.');
+      btn.disabled = false;
+      return;
+    }
+
+    log('\n⏳ Écriture dans Firebase + force-sync...');
+    const resetAt = Date.now();
+    await STORE.set({
+      ...d,
+      recipes: deduped,
+      modifiedAt: resetAt,
+      resetAt: resetAt
+    });
+
+    log(`✅ Firebase mis à jour !`);
+    log(`🔄 Force-sync déclenché (resetAt=${resetAt})`);
+    log(`\n🎉 Tous tes appareils vont charger les ${deduped.length} recettes propres.`);
+    log(`\nTu peux fermer cette page.`);
+  } catch(e) {
+    log('❌ Erreur : ' + e.message);
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

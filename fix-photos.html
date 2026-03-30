@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Réparation photos</title>
+<style>
+  body { font-family: sans-serif; padding: 2rem; max-width: 700px; margin: auto; }
+  button { background: #f97316; color: white; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 8px; cursor: pointer; margin-right: 1rem; }
+  button:disabled { background: #ccc; cursor: default; }
+  #log { margin-top: 1rem; background: #f5f5f5; padding: 1rem; border-radius: 8px; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; max-height: 500px; overflow-y: auto; }
+  input[type=file] { margin: 1rem 0; display: block; font-size: 1rem; }
+</style>
+</head>
+<body>
+<h2>🖼️ Réparation des photos manquantes</h2>
+<p>Sélectionne ton fichier d'export JSON, puis clique sur "Réparer les photos".</p>
+<input type="file" id="jsonFile" accept=".json">
+<button id="btn" onclick="run()" disabled>Réparer les photos</button>
+<div id="log">En attente du fichier JSON...</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:            "AIzaSyB-vaVqrejkRAiW5q3sQvy9crl5RzDeIzc",
+  authDomain:        "mes-recettes-bd049.firebaseapp.com",
+  projectId:         "mes-recettes-bd049",
+  storageBucket:     "mes-recettes-bd049.firebasestorage.app",
+  messagingSenderId: "239169207922",
+  appId:             "1:239169207922:web:1b3d67548cc7bbd8ad0ceb"
+});
+const db = firebase.firestore();
+const STORE = db.collection('data').doc('main');
+
+let exportData = null;
+
+document.getElementById('jsonFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      exportData = JSON.parse(ev.target.result);
+      log(`✅ Fichier chargé : ${exportData.length} recettes dans l'export`);
+      document.getElementById('btn').disabled = false;
+    } catch(err) {
+      log('❌ Erreur lecture JSON : ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+
+function log(msg) {
+  const el = document.getElementById('log');
+  el.textContent += '\n' + msg;
+  el.scrollTop = el.scrollHeight;
+}
+
+function normalize(name) {
+  return (name || '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+async function run() {
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  log('\n⏳ Lecture Firebase...');
+
+  try {
+    const snap = await STORE.get();
+    const d = snap.data() || {};
+    const recipes = d.recipes || [];
+    log(`📦 ${recipes.length} recettes dans Firebase`);
+
+    // Construire un index par nom depuis l'export (garder la version avec photo si dispo)
+    const exportByName = new Map();
+    for (const r of exportData) {
+      const key = normalize(r.name);
+      if (!key) continue;
+      const existing = exportByName.get(key);
+      // Préférer la version avec une photo non-vide
+      if (!existing || (r.photo && !existing.photo)) {
+        exportByName.set(key, r);
+      }
+    }
+
+    // Trouver les recettes Firebase sans photo qui ont une photo dans l'export
+    let fixed = 0;
+    const updatedRecipes = recipes.map(r => {
+      if (r.photo) return r; // déjà une photo → rien à faire
+      const key = normalize(r.name);
+      const exportRecipe = exportByName.get(key);
+      if (exportRecipe && exportRecipe.photo) {
+        log(`  🖼️  Photo restaurée : ${r.name}`);
+        fixed++;
+        return { ...r, photo: exportRecipe.photo };
+      }
+      return r;
+    });
+
+    log(`\n✅ ${fixed} photo(s) restaurée(s)`);
+
+    if (fixed === 0) {
+      log('\n⚠️  Aucune photo à restaurer. Les photos manquantes ne sont peut-être pas dans l\'export.');
+      btn.disabled = false;
+      return;
+    }
+
+    log('\n⏳ Sauvegarde dans Firebase...');
+    const now = Date.now();
+    await STORE.set({
+      ...d,
+      recipes: updatedRecipes,
+      modifiedAt: now,
+      resetAt: now
+    });
+
+    log(`✅ Firebase mis à jour !`);
+    log(`🔄 Force-sync déclenché sur tous les appareils`);
+    log(`\n🎉 Terminé ! Tu peux fermer cette page.`);
+  } catch(e) {
+    log('❌ Erreur : ' + e.message);
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('log').textContent = 'En attente du fichier JSON...';
+</script>
+</body>
+</html>
