@@ -204,6 +204,22 @@ function load() {
     const fbModified = d.lastModified || 0;
     const lcCount    = recipes.filter(r => !String(r.id).startsWith('demo')).length;
 
+    // Force sync : si Firebase a un signal resetAt plus récent que ce qu'on a vu,
+    // on efface le localStorage et on charge Firebase sans discussion
+    const fbResetAt   = d.resetAt || 0;
+    const localResetAt = parseInt(localStorage.getItem('_resetAt') || '0');
+    if (fbResetAt > localResetAt) {
+      localStorage.setItem('_resetAt', String(fbResetAt));
+      recipes    = mergePhotos(fbRecs);
+      mealPlan   = d.mealPlan   || {};
+      customCats = d.customCats || [];
+      _localModifiedAt = fbModified;
+      try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
+      try { localStorage.setItem('mes-repas', JSON.stringify(mealPlan)); } catch(e) {}
+      renderSidebar(); renderTagCloud(); renderCatSelect(); render();
+      return;
+    }
+
     // Premier chargement (localStorage vide) → toujours charger Firebase
     if (lcCount === 0) {
       recipes    = mergePhotos(fbRecs);
@@ -215,7 +231,6 @@ function load() {
     }
 
     // Sécurité : ne jamais écraser Firebase si local a beaucoup moins de recettes
-    // (évite que 3 recettes démo écrasent 200+ recettes Firebase)
     if (lcCount < fbRecs.length * 0.5 && fbRecs.length > 10) {
       recipes    = mergePhotos(fbRecs);
       mealPlan   = d.mealPlan   || {};
@@ -226,8 +241,6 @@ function load() {
     }
 
     // Comparer timestamps puis nombre de recettes
-    // Cas spécial : local a beaucoup plus de recettes que Firebase → local gagne toujours
-    // (protège si Firebase se fait écraser par 3 démos alors que local a 200+)
     const localHasMore = lcCount > fbRecs.length * 2 && lcCount > 10;
     const localWins = localHasMore || _localModifiedAt > fbModified || (_localModifiedAt === fbModified && lcCount > fbRecs.length);
     if (localWins) {
