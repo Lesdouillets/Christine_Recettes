@@ -5,17 +5,27 @@
 <title>Réparation photos</title>
 <style>
   body { font-family: sans-serif; padding: 2rem; max-width: 700px; margin: auto; }
-  button { background: #f97316; color: white; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 8px; cursor: pointer; margin-right: 1rem; }
+  button { background: #f97316; color: white; border: none; padding: 1rem 2rem; font-size: 1.1rem; border-radius: 8px; cursor: pointer; margin-right: 1rem; margin-bottom: 0.5rem; }
   button:disabled { background: #ccc; cursor: default; }
   #log { margin-top: 1rem; background: #f5f5f5; padding: 1rem; border-radius: 8px; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; max-height: 500px; overflow-y: auto; }
   input[type=file] { margin: 1rem 0; display: block; font-size: 1rem; }
+  .step { background: #fff8f0; border: 1px solid #f97316; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
 </style>
 </head>
 <body>
-<h2>🖼️ Réparation des photos manquantes</h2>
-<p>Sélectionne ton fichier d'export JSON, puis clique sur "Réparer les photos".</p>
-<input type="file" id="jsonFile" accept=".json">
-<button id="btn" onclick="run()" disabled>Réparer les photos</button>
+<h2>🖼️ Réparation photos</h2>
+
+<div class="step">
+  <strong>Étape 1 :</strong> Sélectionne l'export JSON du 28 mars
+  <input type="file" id="jsonFile" accept=".json">
+</div>
+
+<div class="step">
+  <strong>Étape 2 :</strong> Lance la réparation (nettoie le document + restaure les photos)
+  <br><br>
+  <button id="btn" onclick="run()" disabled>🔧 Réparer</button>
+</div>
+
 <div id="log">En attente du fichier JSON...</div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -30,7 +40,8 @@ firebase.initializeApp({
   appId:             "1:239169207922:web:1b3d67548cc7bbd8ad0ceb"
 });
 const db = firebase.firestore();
-const STORE = db.collection('data').doc('main');
+const STORE  = db.collection('data').doc('main');
+const PHOTOS = db.collection('photos');
 
 let exportData = null;
 
@@ -69,54 +80,92 @@ async function run() {
     const snap = await STORE.get();
     const d = snap.data() || {};
     const recipes = d.recipes || [];
-    log(`📦 ${recipes.length} recettes dans Firebase`);
+    log(`📦 ${recipes.length} recettes trouvées`);
 
-    // Construire un index par nom depuis l'export (garder la version avec photo si dispo)
+    // ── Étape A : construire index photo depuis l'export (Cloudinary URLs) ──
     const exportByName = new Map();
     for (const r of exportData) {
       const key = normalize(r.name);
       if (!key) continue;
       const existing = exportByName.get(key);
-      // Préférer la version avec une photo non-vide
       if (!existing || (r.photo && !existing.photo)) {
         exportByName.set(key, r);
       }
     }
 
-    // Trouver les recettes Firebase sans photo qui ont une photo dans l'export
-    let fixed = 0;
-    const updatedRecipes = recipes.map(r => {
-      if (r.photo) return r; // déjà une photo → rien à faire
+    // ── Étape B : traiter chaque recette ──
+    let base64Saved = 0;
+    let urlRestored = 0;
+    let alreadyOk   = 0;
+    let noPhoto     = 0;
+
+    const cleanRecipes = [];
+    const photoBatch   = []; // { id, photo } à sauvegarder dans PHOTOS
+
+    for (const r of recipes) {
       const key = normalize(r.name);
-      const exportRecipe = exportByName.get(key);
-      if (exportRecipe && exportRecipe.photo) {
-        log(`  🖼️  Photo restaurée : ${r.name}`);
-        fixed++;
-        return { ...r, photo: exportRecipe.photo };
+      let cleanRecipe = { ...r };
+      let photoToSave = null;
+
+      if (r.photo && r.photo.startsWith('data:')) {
+        // Base64 → déplacer vers PHOTOS collection
+        photoToSave = r.photo;
+        delete cleanRecipe.photo;
+        base64Saved++;
+        log(`  📤 Base64 déplacée vers PHOTOS : ${r.name.substring(0, 40)}`);
+      } else if (r.photo && r.photo.startsWith('http')) {
+        // URL Cloudinary → OK, on garde
+        alreadyOk++;
+      } else {
+        // Pas de photo → chercher dans l'export
+        const exportRec = exportByName.get(key);
+        if (exportRec && exportRec.photo && exportRec.photo.startsWith('http')) {
+          cleanRecipe.photo = exportRec.photo;
+          urlRestored++;
+          log(`  🖼️  URL restaurée : ${r.name.substring(0, 40)}`);
+        } else {
+          noPhoto++;
+        }
       }
-      return r;
-    });
 
-    log(`\n✅ ${fixed} photo(s) restaurée(s)`);
-
-    if (fixed === 0) {
-      log('\n⚠️  Aucune photo à restaurer. Les photos manquantes ne sont peut-être pas dans l\'export.');
-      btn.disabled = false;
-      return;
+      if (photoToSave) {
+        photoBatch.push({ id: String(r.id), photo: photoToSave });
+      }
+      cleanRecipes.push(cleanRecipe);
     }
 
-    log('\n⏳ Sauvegarde dans Firebase...');
+    log(`\n📊 Résumé :`);
+    log(`  ✅ ${alreadyOk} recettes avec photo Cloudinary (OK)`);
+    log(`  📤 ${base64Saved} photos base64 → déplacées vers collection PHOTOS`);
+    log(`  🖼️  ${urlRestored} URLs Cloudinary restaurées depuis l'export`);
+    log(`  ⚪ ${noPhoto} recettes sans photo`);
+
+    // ── Étape C : sauvegarder les photos base64 dans PHOTOS ──
+    if (photoBatch.length > 0) {
+      log(`\n⏳ Sauvegarde de ${photoBatch.length} photos dans PHOTOS...`);
+      // Firestore batch max 500 writes, mais photos sont grosses → une par une
+      for (let i = 0; i < photoBatch.length; i++) {
+        const { id, photo } = photoBatch[i];
+        await PHOTOS.doc(id).set({ photo, updatedAt: Date.now() });
+        log(`  ✅ PHOTOS/${id} sauvegardée (${Math.round(photo.length/1024)}KB)`);
+      }
+    }
+
+    // ── Étape D : écrire les recettes nettoyées dans STORE ──
+    log(`\n⏳ Écriture des recettes nettoyées dans Firebase...`);
     const now = Date.now();
     await STORE.set({
       ...d,
-      recipes: updatedRecipes,
+      recipes: cleanRecipes,
       modifiedAt: now,
       resetAt: now
     });
 
     log(`✅ Firebase mis à jour !`);
     log(`🔄 Force-sync déclenché sur tous les appareils`);
-    log(`\n🎉 Terminé ! Tu peux fermer cette page.`);
+    log(`\n🎉 Terminé ! Recharge l'application sur tous tes appareils.`);
+    log(`   Tu peux fermer cette page.`);
+
   } catch(e) {
     log('❌ Erreur : ' + e.message);
     btn.disabled = false;
