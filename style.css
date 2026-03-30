@@ -905,22 +905,40 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .sidebar-mobile-nav { display: block; }
   .hamburger { display: flex; }
 
-  .header-search { max-width: 200px; }
+  /* Barre de recherche plus grande sur mobile */
+  .header-search { max-width: none; flex: 1; }
 
-  .main { padding: 16px; }
-  .recipe-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .main { padding: 12px; }
+  .recipe-grid { grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; }
   .form-2col { grid-template-columns: 1fr; }
   .form-3col { grid-template-columns: 1fr 1fr; }
-  .ing-header, .ing-row { grid-template-columns: 68px 60px 1fr 28px; }
+  .ing-header, .ing-row { grid-template-columns: 64px 56px 1fr 28px; }
   .ing-row select, .ing-header span:nth-child(4) { display: none; }
   .detail-body { grid-template-columns: 1fr; }
-  .planner-scroll { overflow-x: auto; }
+  .planner-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-  /* Modales mieux adaptées mobile */
-  .overlay { padding: 12px; align-items: flex-end; }
-  .modal { border-radius: var(--radius-l) var(--radius-l) 0 0; max-height: 90vh; }
+  /* Planning : colonnes plus compactes pour moins scroller */
+  .planner-grid { grid-template-columns: 50px repeat(7, minmax(82px, 1fr)); min-width: 624px; }
+  .planner-header-cell .day-date { font-size: 16px; }
+  .planner-cell { min-height: 64px; }
+
+  /* Fiche détail */
+  .detail-photo-header { height: 170px; }
+  .detail-photo-title h2 { font-size: 18px; }
+  .detail-photo-actions { gap: 6px; }
+  .detail-photo-actions .btn-sm { padding: 6px 10px; font-size: 12px; }
+  #d-source a { word-break: break-all; }
+
+  /* Modales en bas de l'écran */
+  .overlay { padding: 0; align-items: flex-end; }
+  .modal { border-radius: var(--radius-l) var(--radius-l) 0 0; max-height: 93vh; }
   .modal-xl { max-width: 100%; }
   .modal-wide { max-width: 100%; }
+}
+
+@media (max-width: 400px) {
+  .recipe-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .card-name { font-size: 13px; }
 }
 
 /* ── MODE LECTURE (masque tout ce qui permet d'éditer) ─ */
