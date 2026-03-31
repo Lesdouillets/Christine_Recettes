@@ -201,60 +201,58 @@ function load() {
 
     const d          = snap.data();
     const fbRecs     = d.recipes || [];
-    const fbModified = d.lastModified || 0;
+    // Compatibilité : ancien champ modifiedAt ou nouveau lastModified
+    const fbModified = d.lastModified || d.modifiedAt || 0;
     const lcCount    = recipes.filter(r => !String(r.id).startsWith('demo')).length;
 
     // Force sync : si Firebase a un signal resetAt plus récent que ce qu'on a vu,
-    // on efface le localStorage et on charge Firebase sans discussion
-    const fbResetAt   = d.resetAt || 0;
+    // on charge Firebase sans discussion, quelle que soit la situation locale
+    const fbResetAt    = d.resetAt || 0;
     const localResetAt = parseInt(localStorage.getItem('_resetAt') || '0');
     if (fbResetAt > localResetAt) {
       localStorage.setItem('_resetAt', String(fbResetAt));
-      recipes    = mergePhotos(fbRecs);
-      mealPlan   = d.mealPlan   || {};
-      customCats = d.customCats || [];
+      recipes          = mergePhotos(fbRecs);
+      mealPlan         = d.mealPlan   || {};
+      customCats       = d.customCats || [];
       _localModifiedAt = fbModified;
       try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
-      try { localStorage.setItem('mes-repas', JSON.stringify(mealPlan)); } catch(e) {}
+      try { localStorage.setItem('mes-repas',    JSON.stringify(mealPlan)); } catch(e) {}
       renderSidebar(); renderTagCloud(); renderCatSelect(); render();
       return;
     }
 
-    // Premier chargement (localStorage vide) → toujours charger Firebase
-    if (lcCount === 0) {
-      recipes    = mergePhotos(fbRecs);
-      mealPlan   = d.mealPlan   || {};
-      customCats = d.customCats || [];
+    // Firebase gagne si local n'a rien, ou si local a 30%+ de recettes de plus
+    // (signe que le local est périmé et n'a pas encore reçu la synchro)
+    const localTooMany = fbRecs.length > 10 && lcCount > fbRecs.length * 1.3;
+    if (lcCount === 0 || localTooMany) {
+      recipes          = mergePhotos(fbRecs);
+      mealPlan         = d.mealPlan   || {};
+      customCats       = d.customCats || [];
+      _localModifiedAt = fbModified;
       try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
+      try { localStorage.setItem('mes-repas',    JSON.stringify(mealPlan)); } catch(e) {}
       renderSidebar(); renderTagCloud(); renderCatSelect(); render();
       return;
     }
 
-    // Sécurité : ne jamais écraser Firebase si local a beaucoup moins de recettes
-    if (lcCount < fbRecs.length * 0.5 && fbRecs.length > 10) {
-      recipes    = mergePhotos(fbRecs);
-      mealPlan   = d.mealPlan   || {};
-      customCats = d.customCats || [];
-      try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
-      renderSidebar(); renderTagCloud(); renderCatSelect(); render();
-      return;
-    }
-
-    // Comparer timestamps puis nombre de recettes
-    const localHasMore = lcCount > fbRecs.length * 2 && lcCount > 10;
-    const localWins = localHasMore || _localModifiedAt > fbModified || (_localModifiedAt === fbModified && lcCount > fbRecs.length);
+    // Local gagne uniquement s'il a été modifié plus récemment que Firebase
+    const localWins = _localModifiedAt > 0 && _localModifiedAt > fbModified;
     if (localWins) {
-      // Local plus récent ou plus complet → pousser vers Firebase
-      _localModifiedAt = _localModifiedAt || Date.now();
+      // Local plus récent → pousser vers Firebase en préservant resetAt
+      const savedResetAt = parseInt(localStorage.getItem('_resetAt') || '0');
       _ownWrite = true;
-      STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats, lastModified: _localModifiedAt })
+      STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats,
+                  lastModified: _localModifiedAt,
+                  ...(savedResetAt ? { resetAt: savedResetAt } : {}) })
         .catch(() => { _ownWrite = false; });
     } else {
       // Firebase plus récent (autre appareil) → charger depuis Firebase
-      recipes    = mergePhotos(fbRecs);
-      mealPlan   = d.mealPlan   || {};
-      customCats = d.customCats || [];
+      recipes          = mergePhotos(fbRecs);
+      mealPlan         = d.mealPlan   || {};
+      customCats       = d.customCats || [];
+      _localModifiedAt = fbModified;
       try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
+      try { localStorage.setItem('mes-repas',    JSON.stringify(mealPlan)); } catch(e) {}
       renderSidebar(); renderTagCloud(); renderCatSelect(); render();
     }
   }, err => console.warn('Firebase sync:', err));

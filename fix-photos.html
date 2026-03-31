@@ -134,11 +134,11 @@ async function run() {
     // ── 3. Construire le document final (sans lire Firebase pour les recettes) ──
     const now = Date.now();
     const toWrite = {
-      recipes:    cleanRecipes,
-      mealPlan:   {},   // remise à zéro propre
-      customCats: [],
-      modifiedAt: now,
-      resetAt:    now,
+      recipes:      cleanRecipes,
+      mealPlan:     {},
+      customCats:   [],
+      lastModified: now,   // champ lu par app.js
+      resetAt:      now,   // force tous les appareils à recharger
     };
 
     const sizeKB = Math.round(JSON.stringify(toWrite).length / 1024);
