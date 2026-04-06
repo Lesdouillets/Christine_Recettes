@@ -304,26 +304,9 @@
       </div>
     </div>
 
+    <!-- VUE TO-DO MULTI-LISTES -->
     <div id="view-todo" style="display:none">
-      <div class="main-topbar todo-topbar">
-        <h2>✅ To-do</h2>
-        <div class="todo-filter-tabs">
-          <button class="todo-filter active" data-filter="all">Tout</button>
-          <button class="todo-filter" data-filter="li">💜 Li</button>
-          <button class="todo-filter" data-filter="lou">💙 Lou</button>
-          <button class="todo-filter" data-filter="nous">🤝 Nous</button>
-        </div>
-      </div>
-      <div class="todo-add-form">
-        <input type="text" id="todo-add-input" placeholder="Nouvelle tâche…" autocomplete="off">
-        <div class="todo-assignee-btns">
-          <button class="todo-assign-btn active" data-assign="nous">🤝 Nous</button>
-          <button class="todo-assign-btn" data-assign="li">💜 Li</button>
-          <button class="todo-assign-btn" data-assign="lou">💙 Lou</button>
-        </div>
-        <button class="btn btn-primary" onclick="addTodoItem()">Ajouter</button>
-      </div>
-      <div id="todo-items-list"></div>
+      <div id="todo-container"></div>
     </div>
 
   </main>
@@ -677,7 +660,7 @@ Faire cuire dans une poêle beurrée 2 min de chaque côté."></textarea>
   </button>
   <button class="bnav-tab" data-view="todo">
     <span class="bnav-icon">✅</span>
-    <span class="bnav-label">Tout doux</span>
+    <span class="bnav-label">To-do</span>
   </button>
   <button class="bnav-tab" data-view="settings">
     <span class="bnav-icon">⚙️</span>

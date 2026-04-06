@@ -176,7 +176,7 @@ function load() {
   try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
   try { urlTodo    = JSON.parse(localStorage.getItem('mes-urls-todo')         || '[]'); } catch { urlTodo = []; }
   loadShopItems();
-  loadTodoItems();
+  loadTodoLists();
   initTodoSync();
   initUrlTodoSync();
 
@@ -2329,87 +2329,284 @@ function deleteCheckedShopItems() {
   toast(`${nb} article${nb > 1 ? 's' : ''} supprimé${nb > 1 ? 's' : ''}`);
 }
 
-// ── TO-DO PARTAGÉE Li / Lou / Nous ────────────────────
+// ── TO-DO MULTI-LISTES ────────────────────────────────
 const TODO_STORE = db.collection('data').doc('todos');
+
+// Listes prédéfinies créées au premier lancement
+const DEFAULT_TODO_LISTS = [
+  { id: 'general', name: 'Général', emoji: '✅', categories: [], items: [] },
+  {
+    id: 'weekend-enfant', name: 'Week-end enfant', emoji: '👶',
+    categories: [
+      { id: 'vetements', name: 'Vêtements', emoji: '👕' },
+      { id: 'repas',     name: 'Repas',     emoji: '🚀' },
+      { id: 'nuit',      name: 'Nuit',      emoji: '🧸' },
+      { id: 'autre',     name: 'Autre',     emoji: '🐝' },
+      { id: 'sortie',    name: 'Sortie',    emoji: '🛴' },
+    ],
+    items: [
+      {id:'we-1',title:'Body',             category:'vetements',done:false,assignee:'nous',createdAt:1},
+      {id:'we-2',title:'Pantalon',          category:'vetements',done:false,assignee:'nous',createdAt:2},
+      {id:'we-3',title:'T-shirt',           category:'vetements',done:false,assignee:'nous',createdAt:3},
+      {id:'we-4',title:'Pull',              category:'vetements',done:false,assignee:'nous',createdAt:4},
+      {id:'we-5',title:'Chaussettes',       category:'vetements',done:false,assignee:'nous',createdAt:5},
+      {id:'we-6',title:'Pijama',            category:'vetements',done:false,assignee:'nous',createdAt:6},
+      {id:'we-7',title:'Gourdes remplissable',category:'repas',  done:false,assignee:'nous',createdAt:7},
+      {id:'we-8',title:'Cuillère',          category:'repas',   done:false,assignee:'nous',createdAt:8},
+      {id:'we-9',title:'Vitamine',          category:'repas',   done:false,assignee:'nous',createdAt:9},
+      {id:'we-10',title:'Biberons',         category:'repas',   done:false,assignee:'nous',createdAt:10},
+      {id:'we-11',title:'Pot',              category:'repas',   done:false,assignee:'nous',createdAt:11},
+      {id:'we-12',title:'Gourdes eau',      category:'repas',   done:false,assignee:'nous',createdAt:12},
+      {id:'we-13',title:'Lait',             category:'repas',   done:false,assignee:'nous',createdAt:13},
+      {id:'we-14',title:'Bavoir tissu',     category:'repas',   done:false,assignee:'nous',createdAt:14},
+      {id:'we-15',title:'Bavoir plastique', category:'repas',   done:false,assignee:'nous',createdAt:15},
+      {id:'we-16',title:'Piou piou',        category:'nuit',    done:false,assignee:'nous',createdAt:16},
+      {id:'we-17',title:'Chargeur caméra',  category:'nuit',    done:false,assignee:'nous',createdAt:17},
+      {id:'we-18',title:'Tétine',           category:'nuit',    done:false,assignee:'nous',createdAt:18},
+      {id:'we-19',title:'Turbulette',       category:'nuit',    done:false,assignee:'nous',createdAt:19},
+      {id:'we-20',title:'Crème',            category:'nuit',    done:false,assignee:'nous',createdAt:20},
+      {id:'we-21',title:'Lit parapluie',    category:'nuit',    done:false,assignee:'nous',createdAt:21},
+      {id:'we-22',title:'Dolodent',         category:'nuit',    done:false,assignee:'nous',createdAt:22},
+      {id:'we-23',title:'Doliprane',        category:'nuit',    done:false,assignee:'nous',createdAt:23},
+      {id:'we-24',title:'Caméra',           category:'nuit',    done:false,assignee:'nous',createdAt:24},
+      {id:'we-25',title:'Doudou',           category:'nuit',    done:false,assignee:'nous',createdAt:25},
+      {id:'we-26',title:'Ventoline + masque',category:'autre',  done:false,assignee:'nous',createdAt:26},
+      {id:'we-27',title:'Éponge',           category:'autre',   done:false,assignee:'nous',createdAt:27},
+      {id:'we-28',title:'Savon',            category:'autre',   done:false,assignee:'nous',createdAt:28},
+      {id:'we-29',title:'Serviette',        category:'autre',   done:false,assignee:'nous',createdAt:29},
+      {id:'we-30',title:'Jouets',           category:'autre',   done:false,assignee:'nous',createdAt:30},
+      {id:'we-31',title:'Coton',            category:'autre',   done:false,assignee:'nous',createdAt:31},
+      {id:'we-32',title:'Couches',          category:'autre',   done:false,assignee:'nous',createdAt:32},
+      {id:'we-33',title:'Crème solaire',    category:'sortie',  done:false,assignee:'nous',createdAt:33},
+      {id:'we-34',title:'Bob',              category:'sortie',  done:false,assignee:'nous',createdAt:34},
+      {id:'we-35',title:'Porte bébé/poussette',category:'sortie',done:false,assignee:'nous',createdAt:35},
+      {id:'we-36',title:'Manteau',          category:'sortie',  done:false,assignee:'nous',createdAt:36},
+      {id:'we-37',title:'Gant',             category:'sortie',  done:false,assignee:'nous',createdAt:37},
+      {id:'we-38',title:'Chaussures',       category:'sortie',  done:false,assignee:'nous',createdAt:38},
+      {id:'we-39',title:'Pantalon jaune',   category:'sortie',  done:false,assignee:'nous',createdAt:39},
+      {id:'we-40',title:'Bonnet',           category:'sortie',  done:false,assignee:'nous',createdAt:40},
+      {id:'we-41',title:'Lunettes de soleil',category:'sortie', done:false,assignee:'nous',createdAt:41},
+      {id:'we-42',title:'Plaid',            category:'sortie',  done:false,assignee:'nous',createdAt:42},
+    ]
+  }
+];
+
+let todoLists        = [];   // [{ id, name, emoji, categories, items }]
+let activeTodoListId = null; // null = vue liste des listes
+let todoListFilter   = 'all';
+let todoListAssignee = 'nous';
+let collapsedCats    = {};   // { "listId_catId": true }
+
 const ASSIGNEES = {
   li:   { label: 'Li',   emoji: '💜', color: '#8b5cf6' },
   lou:  { label: 'Lou',  emoji: '💙', color: '#3b82f6' },
   nous: { label: 'Nous', emoji: '🤝', color: '#10b981' },
 };
-function loadTodoItems() {
-  try { todoItems = JSON.parse(localStorage.getItem('mes-todo') || '[]'); } catch { todoItems = []; }
+// ── Persistance ───────────────────────────────────────
+function loadTodoLists() {
+  try { todoLists = JSON.parse(localStorage.getItem('mes-todo-lists') || 'null'); } catch { todoLists = null; }
+  if (!todoLists) {
+    // Migration depuis l'ancien format
+    let oldItems = [];
+    try { oldItems = JSON.parse(localStorage.getItem('mes-todo') || '[]'); } catch {}
+    todoLists = DEFAULT_TODO_LISTS.map(l => ({ ...l, items: [...l.items] }));
+    if (oldItems.length) todoLists[0].items = oldItems; // migration dans Général
+  }
 }
-function saveTodoItems() {
-  try { localStorage.setItem('mes-todo', JSON.stringify(todoItems)); } catch(e) {}
-  TODO_STORE.set({ todos: todoItems }).catch(e => console.warn('todo sync:', e));
+function saveTodoLists() {
+  try { localStorage.setItem('mes-todo-lists', JSON.stringify(todoLists)); } catch(e) {}
+  TODO_STORE.set({ lists: todoLists, v: 2 }).catch(e => console.warn('todo sync:', e));
 }
 function initTodoSync() {
   TODO_STORE.onSnapshot(snap => {
     if (!snap.exists) return;
-    const remote = snap.data().todos || [];
-    if (remote.length >= todoItems.length) {
-      todoItems = remote;
-      try { localStorage.setItem('mes-todo', JSON.stringify(todoItems)); } catch(e) {}
-      if (currentView === 'todo') renderTodoView();
+    const d = snap.data();
+    if (d.v === 2 && d.lists) {
+      // Nouveau format multi-listes : prendre si plus récent (plus de listes ou plus d'items)
+      const remoteTotal = d.lists.reduce((s, l) => s + l.items.length, 0);
+      const localTotal  = todoLists.reduce((s, l) => s + l.items.length, 0);
+      if (remoteTotal >= localTotal) {
+        todoLists = d.lists;
+        try { localStorage.setItem('mes-todo-lists', JSON.stringify(todoLists)); } catch(e) {}
+        if (currentView === 'todo') renderTodoView();
+      }
     }
   }, () => {});
 }
+
+// ── Rendu ─────────────────────────────────────────────
 function renderTodoView() {
-  const el = document.getElementById('todo-items-list');
-  if (!el) return;
-  const filtered = todoFilter === 'all' ? todoItems : todoItems.filter(x => x.assignee === todoFilter);
-  const undone = filtered.filter(x => !x.done);
-  const done   = filtered.filter(x =>  x.done);
-  const renderTask = t => {
-    const a = ASSIGNEES[t.assignee] || ASSIGNEES.nous;
-    return `<div class="todo-task${t.done ? ' done' : ''}" style="--task-color:${a.color}">
-      <input type="checkbox" id="tdi-${t.id}" ${t.done ? 'checked' : ''} onchange="toggleTodoItem('${t.id}')">
-      <label for="tdi-${t.id}">${esc(t.title)}</label>
-      <span class="todo-badge">${a.emoji} ${a.label}</span>
-      <button class="btn-remove-shop" onclick="removeTodoItem('${t.id}')">✕</button>
-    </div>`;
-  };
-  el.innerHTML = undone.length || done.length
-    ? undone.map(renderTask).join('') +
-      (done.length ? `<div class="shop-done-sep">— ${done.length} tâche${done.length>1?'s':''} terminée${done.length>1?'s':''} —</div>` + done.map(renderTask).join('') : '')
-    : '<p class="shop-empty">Aucune tâche ici.<br>Ajoutez-en une ci-dessus !</p>';
+  const container = document.getElementById('todo-container');
+  if (!container) return;
+  if (activeTodoListId) renderTodoListDetail(container);
+  else renderTodoListsHome(container);
 }
-function addTodoItem() {
-  const inp = document.getElementById('todo-add-input');
+
+function renderTodoListsHome(container) {
+  const totalPending = l => l.items.filter(i => !i.done).length;
+  container.innerHTML = `
+    <div class="todo-lists-header">
+      <h2>To-do</h2>
+    </div>
+    <div class="todo-list-cards">
+      ${todoLists.map(l => `
+        <button class="todo-list-card" onclick="openTodoList('${l.id}')">
+          <span class="todo-list-card-emoji">${l.emoji}</span>
+          <span class="todo-list-card-info">
+            <span class="todo-list-card-name">${esc(l.name)}</span>
+            <span class="todo-list-card-count">${totalPending(l)} en cours · ${l.items.length} articles</span>
+          </span>
+          <span class="todo-list-card-arrow">›</span>
+        </button>
+      `).join('')}
+    </div>
+    <div class="todo-new-list-form">
+      <input class="todo-emoji-input" id="new-list-emoji" type="text" placeholder="📝" maxlength="2" value="">
+      <input id="new-list-name" type="text" placeholder="Nouvelle liste…" autocomplete="off">
+      <button class="btn btn-primary btn-sm" onclick="addTodoList()">Créer</button>
+    </div>`;
+  const nameInp = container.querySelector('#new-list-name');
+  if (nameInp) nameInp.addEventListener('keydown', e => { if (e.key === 'Enter') addTodoList(); });
+}
+
+function renderTodoListDetail(container) {
+  const list = todoLists.find(l => l.id === activeTodoListId);
+  if (!list) { activeTodoListId = null; renderTodoListsHome(container); return; }
+
+  const hasCats = list.categories && list.categories.length > 0;
+  const filteredItems = todoListFilter === 'all' ? list.items : list.items.filter(i => i.assignee === todoListFilter);
+
+  const catOptions = hasCats
+    ? list.categories.map(c => `<option value="${c.id}">${c.emoji} ${esc(c.name)}</option>`).join('')
+    : '';
+
+  container.innerHTML = `
+    <div class="todo-detail-header">
+      <button class="todo-back-btn" onclick="closeTodoList()">‹ To-do</button>
+      <span class="todo-detail-title">${list.emoji} ${esc(list.name)}</span>
+      ${hasCats ? `<button class="todo-reset-btn" onclick="resetTodoList('${list.id}')">Remettre à zéro</button>` : ''}
+    </div>
+    <div class="todo-filter-row">
+      ${['all','nous','li','lou'].map(f => {
+        const a = f === 'all' ? {emoji:'', label:'Tout'} : ASSIGNEES[f];
+        return `<button class="todo-filter${todoListFilter===f?' active':''}" onclick="setTodoFilter('${f}')">${a.emoji} ${a.label}</button>`;
+      }).join('')}
+    </div>
+    <div class="todo-add-form">
+      <input id="todo-item-input" type="text" placeholder="Ajouter…" autocomplete="off">
+      ${hasCats ? `<select id="todo-item-cat">${catOptions}</select>` : ''}
+      <div class="todo-assignee-btns">
+        ${Object.entries(ASSIGNEES).map(([k,a]) =>
+          `<button class="todo-assign-btn${todoListAssignee===k?' active':''}" onclick="setTodoAssignee('${k}')">${a.emoji}</button>`
+        ).join('')}
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addTodoListItem()">+</button>
+    </div>
+    <div id="todo-items-container">
+      ${hasCats ? renderCatSections(list, filteredItems) : renderFlatItems(list, filteredItems)}
+    </div>`;
+
+  const inp = container.querySelector('#todo-item-input');
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') addTodoListItem(); });
+}
+
+function renderCatSections(list, items) {
+  return list.categories.map(cat => {
+    const catItems = items.filter(i => i.category === cat.id);
+    const key = list.id + '_' + cat.id;
+    const collapsed = collapsedCats[key] ? ' collapsed' : '';
+    const doneCount = catItems.filter(i => i.done).length;
+    return `
+      <div class="todo-cat-section${collapsed}" id="cats-${key}">
+        <div class="todo-cat-header" onclick="toggleCat('${key}')">
+          <span class="todo-cat-header-left">
+            ${cat.emoji} ${esc(cat.name)}
+            <span class="todo-cat-count">${catItems.length - doneCount}/${catItems.length}</span>
+          </span>
+          <span class="todo-cat-chevron">▾</span>
+        </div>
+        <div class="todo-cat-items">
+          ${catItems.length ? catItems.map(i => renderTaskHtml(list.id, i)).join('') : '<div style="padding:10px 14px;color:var(--text-3);font-size:13px">Vide</div>'}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderFlatItems(list, items) {
+  const undone = items.filter(i => !i.done);
+  const done   = items.filter(i =>  i.done);
+  if (!undone.length && !done.length) return '<p class="shop-empty">Aucune tâche.<br>Ajoutez-en une ci-dessus !</p>';
+  return `<div class="todo-tasks-flat">
+    ${undone.map(i => renderTaskHtml(list.id, i)).join('')}
+    ${done.length ? `<div class="todo-done-sep">— ${done.length} terminée${done.length>1?'s':''} —</div>` + done.map(i => renderTaskHtml(list.id, i)).join('') : ''}
+  </div>`;
+}
+
+function renderTaskHtml(listId, item) {
+  const a = ASSIGNEES[item.assignee] || ASSIGNEES.nous;
+  return `<div class="todo-task${item.done ? ' done' : ''}" style="--task-color:${a.color}">
+    <input type="checkbox" id="ti-${item.id}" ${item.done ? 'checked' : ''} onchange="toggleTodoListItem('${listId}','${item.id}')">
+    <label for="ti-${item.id}">${esc(item.title)}</label>
+    <button class="todo-task-del" onclick="removeTodoListItem('${listId}','${item.id}')">✕</button>
+  </div>`;
+}
+
+// ── Actions ───────────────────────────────────────────
+function openTodoList(id) { activeTodoListId = id; renderTodoView(); }
+function closeTodoList()  { activeTodoListId = null; renderTodoView(); }
+
+function setTodoFilter(f)   { todoListFilter = f;   renderTodoView(); }
+function setTodoAssignee(a) { todoListAssignee = a; renderTodoView(); }
+
+function toggleCat(key) {
+  collapsedCats[key] = !collapsedCats[key];
+  const el = document.getElementById('cats-' + key);
+  if (el) el.classList.toggle('collapsed', !!collapsedCats[key]);
+}
+
+function addTodoList() {
+  const nameInp  = document.getElementById('new-list-name');
+  const emojiInp = document.getElementById('new-list-emoji');
+  const name = nameInp?.value.trim();
+  if (!name) return;
+  const emoji = emojiInp?.value.trim() || '📝';
+  todoLists.push({ id: 'list-' + Date.now(), name, emoji, categories: [], items: [] });
+  saveTodoLists(); renderTodoView();
+}
+
+function addTodoListItem() {
+  const inp   = document.getElementById('todo-item-input');
   const title = inp?.value.trim();
   if (!title) return;
-  todoItems.unshift({ id: String(Date.now()), title, assignee: todoAssignee, done: false, createdAt: Date.now() });
-  saveTodoItems(); renderTodoView();
-  inp.value = ''; inp.focus();
+  const list = todoLists.find(l => l.id === activeTodoListId);
+  if (!list) return;
+  const catEl = document.getElementById('todo-item-cat');
+  const category = catEl?.value || '';
+  list.items.unshift({ id: String(Date.now()), title, category, assignee: todoListAssignee, done: false, createdAt: Date.now() });
+  saveTodoLists(); renderTodoView();
+  document.getElementById('todo-item-input')?.focus();
 }
-function toggleTodoItem(id) {
-  const t = todoItems.find(x => x.id === id);
-  if (t) { t.done = !t.done; saveTodoItems(); renderTodoView(); }
+
+function toggleTodoListItem(listId, itemId) {
+  const list = todoLists.find(l => l.id === listId);
+  const item = list?.items.find(i => i.id === itemId);
+  if (item) { item.done = !item.done; saveTodoLists(); }
 }
-function removeTodoItem(id) {
-  todoItems = todoItems.filter(x => x.id !== id);
-  saveTodoItems(); renderTodoView();
+
+function removeTodoListItem(listId, itemId) {
+  const list = todoLists.find(l => l.id === listId);
+  if (list) { list.items = list.items.filter(i => i.id !== itemId); saveTodoLists(); renderTodoView(); }
 }
-function initTodoUI() {
-  // Filtres
-  document.querySelectorAll('.todo-filter').forEach(btn => {
-    btn.addEventListener('click', () => {
-      todoFilter = btn.dataset.filter;
-      document.querySelectorAll('.todo-filter').forEach(b => b.classList.toggle('active', b === btn));
-      renderTodoView();
-    });
-  });
-  // Boutons assignee
-  document.querySelectorAll('.todo-assign-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      todoAssignee = btn.dataset.assign;
-      document.querySelectorAll('.todo-assign-btn').forEach(b => b.classList.toggle('active', b === btn));
-    });
-  });
-  // Enter
-  const inp = document.getElementById('todo-add-input');
-  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') addTodoItem(); });
+
+function resetTodoList(listId) {
+  const list = todoLists.find(l => l.id === listId);
+  if (!list) return;
+  if (!confirm(`Remettre à zéro "${list.name}" ? Toutes les cases seront décochées.`)) return;
+  list.items.forEach(i => { i.done = false; });
+  saveTodoLists(); renderTodoView();
 }
+
+function initTodoUI() { /* géré dynamiquement */ }
 
 // ── DATE DERNIÈRE RECETTE IMPORTÉE ────────────────────
 function renderLastImportDate() {
