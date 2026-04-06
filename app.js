@@ -2990,10 +2990,10 @@ function renderMaisonRoomDetail(container) {
             : `<div class="maison-photos-empty">${room.emoji}<br>Pas encore de photo</div>`
           }
         </div>
-        <label class="maison-photo-btn">
+        <button type="button" class="maison-photo-btn" onclick="document.getElementById('maison-file-${room.id}').click()">
           📷 Ajouter une photo
-          <input type="file" accept="image/*" style="display:none" onchange="uploadMaisonPhoto(event,'${room.id}')">
-        </label>
+        </button>
+        <input type="file" id="maison-file-${room.id}" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" onchange="uploadMaisonPhoto(event,'${room.id}')">
       </div>
 
       <!-- Notes / inventaire -->
