@@ -2014,7 +2014,7 @@ function updateFab() {
 
 // ── SWIPE ENTRE ONGLETS ───────────────────────────────
 function initSwipe() {
-  const VIEWS = ['recipes', 'planner', 'todo', 'settings'];
+  const VIEWS = ['recipes', 'planner', 'todo', 'shop', 'settings'];
   let startX = 0, startY = 0, blocked = false;
   const main = document.getElementById('main');
   main.addEventListener('touchstart', e => {
