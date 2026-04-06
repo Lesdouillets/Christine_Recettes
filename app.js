@@ -1986,6 +1986,7 @@ function switchView(view) {
   const searchEl = document.querySelector('.header-search');
   if (searchEl) searchEl.style.display = view === 'recipes' ? '' : 'none';
 
+  if (view !== 'recipes') resetPullToRefresh();
   updateFab();
   if (view === 'planner') renderPlanner();
   else if (view === 'shop')    renderShopView();
@@ -2080,44 +2081,54 @@ function initSwipe() {
 }
 
 // ── PULL-TO-REFRESH ───────────────────────────────────
+let _ptrActive = false;
+let _ptrStartY = 0;
+let _ptrIndicator = null;
+
+function resetPullToRefresh() {
+  _ptrActive = false;
+  if (_ptrIndicator) {
+    _ptrIndicator.style.transition = 'none';
+    _ptrIndicator.style.opacity = '0';
+    _ptrIndicator.style.transform = 'translateX(-50%) translateY(0)';
+    _ptrIndicator.classList.remove('spinning');
+  }
+}
+
 function initPullToRefresh() {
-  const indicator = document.getElementById('ptr-indicator');
+  _ptrIndicator = document.getElementById('ptr-indicator');
   const main = document.getElementById('main');
-  let startY = 0, active = false;
 
   main.addEventListener('touchstart', e => {
     if (currentView === 'recipes' && main.scrollTop === 0) {
-      startY = e.touches[0].clientY;
-      active = true;
+      _ptrStartY = e.touches[0].clientY;
+      _ptrActive = true;
     } else {
-      active = false;
-      // S'assurer que l'indicateur est invisible si on est hors recettes
-      indicator.style.opacity = '0';
-      indicator.style.transform = 'translateX(-50%) translateY(0)';
+      resetPullToRefresh();
     }
   }, { passive: true });
 
   main.addEventListener('touchmove', e => {
-    if (!active || currentView !== 'recipes') return;
-    const dy = Math.min(e.touches[0].clientY - startY, 80);
+    if (!_ptrActive || currentView !== 'recipes') { resetPullToRefresh(); return; }
+    const dy = Math.min(e.touches[0].clientY - _ptrStartY, 80);
     if (dy > 0) {
-      indicator.style.transform = `translateX(-50%) translateY(${dy + 40}px)`;
-      indicator.style.opacity = String(Math.min(dy / 60, 1));
+      _ptrIndicator.style.transform = `translateX(-50%) translateY(${dy + 40}px)`;
+      _ptrIndicator.style.opacity = String(Math.min(dy / 60, 1));
     }
   }, { passive: true });
 
   main.addEventListener('touchend', e => {
-    if (!active) return;
-    active = false;
-    const dy = e.changedTouches[0].clientY - startY;
-    indicator.style.transition = 'transform .3s, opacity .3s';
-    indicator.style.transform = 'translateX(-50%) translateY(0)';
-    indicator.style.opacity = '0';
-    setTimeout(() => { indicator.style.transition = ''; }, 300);
-    if (dy > 60 && currentView === 'recipes') {
-      indicator.classList.add('spinning');
+    if (!_ptrActive || currentView !== 'recipes') { resetPullToRefresh(); return; }
+    const dy = e.changedTouches[0].clientY - _ptrStartY;
+    _ptrActive = false;
+    _ptrIndicator.style.transition = 'transform .3s, opacity .3s';
+    _ptrIndicator.style.transform = 'translateX(-50%) translateY(0)';
+    _ptrIndicator.style.opacity = '0';
+    setTimeout(() => { if (_ptrIndicator) _ptrIndicator.style.transition = ''; }, 300);
+    if (dy > 60) {
+      _ptrIndicator.classList.add('spinning');
       forceLoadFromCloud();
-      setTimeout(() => indicator.classList.remove('spinning'), 1200);
+      setTimeout(() => _ptrIndicator.classList.remove('spinning'), 1200);
     }
   }, { passive: true });
 }
