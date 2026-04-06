@@ -61,26 +61,79 @@ const STORE   = db.collection('data').doc('main');
 const PHOTOS  = db.collection('photos'); // chaque doc = { photo: "data:..." } pour un recipeId
 let _ownWrite = false; // évite re-render inutile sur notre propre écriture
 
-// ── TOKEN DE PARTAGE SÉCURISÉ ─────────────────────────
-function getOrCreateShareToken() {
-  let t = localStorage.getItem('share-token');
-  if (!t) {
-    t = Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
-    localStorage.setItem('share-token', t);
-  }
-  return t;
+// ── SYSTÈME D'ACCÈS PAR PIN ────────────────────────────
+// Par défaut, l'app est en lecture seule.
+// Seul quelqu'un connaissant le PIN peut modifier.
+// sessionStorage : déverrouillé jusqu'à fermeture de l'onglet.
+
+function _isUnlocked() {
+  const pin = localStorage.getItem('edit-pin');
+  if (!pin) return true; // aucun PIN défini = proprio sur son appareil
+  return sessionStorage.getItem('edit-unlocked') === '1';
 }
-function regenerateShareToken() {
-  localStorage.removeItem('share-token');
-  getOrCreateShareToken();
-  toast('✓ Nouveau lien généré — les anciens liens ne fonctionnent plus.', 'success');
+
+// Déverrouiller avec le PIN
+function unlockEdit() {
+  const pin = localStorage.getItem('edit-pin');
+  if (!pin) { sessionStorage.setItem('edit-unlocked', '1'); return true; }
+  const entered = prompt('🔒 Code PIN pour modifier :');
+  if (entered === null) return false;
+  if (entered === pin) {
+    sessionStorage.setItem('edit-unlocked', '1');
+    document.documentElement.classList.remove('lecture-mode');
+    toast('✓ Mode édition activé', 'success');
+    // Rafraîchir la vue courante pour montrer les boutons d'édition
+    switchView(currentView);
+    return true;
+  } else {
+    toast('Code PIN incorrect', 'error');
+    return false;
+  }
+}
+
+function lockEdit() {
+  sessionStorage.removeItem('edit-unlocked');
+  document.documentElement.classList.add('lecture-mode');
+  switchView(currentView);
+  toast('🔒 Mode lecture activé', 'success');
+}
+
+function setEditPin() {
+  const current = localStorage.getItem('edit-pin');
+  if (current && !_isUnlocked()) {
+    toast('Déverrouillez d\'abord l\'app pour changer le PIN', 'error');
+    return;
+  }
+  const newPin = prompt('Nouveau code PIN (4 chiffres) — laisser vide pour désactiver :');
+  if (newPin === null) return;
+  if (newPin === '') {
+    localStorage.removeItem('edit-pin');
+    sessionStorage.setItem('edit-unlocked', '1');
+    toast('✓ Protection PIN désactivée', 'success');
+  } else if (/^\d{4,8}$/.test(newPin)) {
+    localStorage.setItem('edit-pin', newPin);
+    sessionStorage.setItem('edit-unlocked', '1');
+    toast('✓ PIN enregistré — partagez l\'URL sans le PIN !', 'success');
+  } else {
+    toast('PIN invalide — utilisez 4 à 8 chiffres', 'error');
+  }
+  initSettingsView();
+}
+
+function copyReadOnlyLink() {
+  const url = location.origin + location.pathname;
+  navigator.clipboard.writeText(url).then(() => {
+    toast('✓ Lien copié ! Sans le PIN, vos invités ne peuvent que consulter les recettes.', 'success');
+  }).catch(() => {
+    prompt('Copiez ce lien :', url);
+  });
 }
 
 // ── MODE LECTURE ───────────────────────────────────────
-const _urlP = new URLSearchParams(location.search);
-// ?v=TOKEN (nouveau format sécurisé) OU ?mode=lecture (rétro-compat)
-const LECTURE_MODE = !!_urlP.get('v') || _urlP.get('mode') === 'lecture';
-if (LECTURE_MODE) document.documentElement.classList.add('lecture-mode');
+// Lecture seule si un PIN est défini ET pas encore déverrouillé cette session
+// LECTURE_MODE est une fonction dynamique (pas une constante)
+function LECTURE_MODE() { return !_isUnlocked(); }
+if (LECTURE_MODE()) document.documentElement.classList.add('lecture-mode');
 
 // ── ÉTAT ──────────────────────────────────────────────
 let recipes        = [];
@@ -1401,7 +1454,7 @@ function editDetailRecipe() {
 let editTags = [];
 
 function openAdd() {
-  if (LECTURE_MODE) return;
+  if (LECTURE_MODE()) { unlockEdit(); return; }
   document.getElementById('edit-modal-title').textContent = 'Nouvelle recette';
   document.getElementById('edit-del-btn').style.display = 'none';
   renderCatSelect();
@@ -1410,7 +1463,7 @@ function openAdd() {
 }
 
 function openEdit(id) {
-  if (LECTURE_MODE) return;
+  if (LECTURE_MODE()) { unlockEdit(); return; }
   const r = recipes.find(x => x.id === id);
   if (!r) return;
   document.getElementById('edit-modal-title').textContent = 'Modifier la recette';
@@ -2144,6 +2197,17 @@ function initPullToRefresh() {
 
 // ── SETTINGS VIEW ─────────────────────────────────────
 function initSettingsView() {
+  // État du PIN
+  const pin = localStorage.getItem('edit-pin');
+  const pinLabel = document.getElementById('pin-label');
+  const pinDesc  = document.getElementById('pin-desc');
+  const lockBtn  = document.getElementById('lock-btn');
+  if (pinLabel) pinLabel.textContent = pin ? 'Modifier le code PIN' : 'Définir un code PIN';
+  if (pinDesc)  pinDesc.textContent  = pin
+    ? (_isUnlocked() ? '✅ PIN activé — édition déverrouillée cette session' : '🔒 PIN activé — lecture seule')
+    : 'Aucun PIN — définir un code pour protéger l\'édition';
+  if (lockBtn)  lockBtn.style.display = (_isUnlocked() && pin) ? '' : 'none';
+
   // Mettre à jour l'état du toggle notifications
   const toggle = document.getElementById('notif-toggle');
   const desc   = document.getElementById('notif-desc');

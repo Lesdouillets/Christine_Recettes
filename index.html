@@ -288,20 +288,28 @@
         </div>
 
         <div class="settings-section">
-          <div class="settings-section-title">Partage</div>
+          <div class="settings-section-title">Partage &amp; sécurité</div>
           <button class="settings-row" onclick="copyReadOnlyLink()">
             <span class="settings-row-icon">🔗</span>
             <span class="settings-row-text">
               <span class="settings-row-label">Copier le lien de partage</span>
-              <span class="settings-row-desc">Lien unique — lecture seule, impossible d'éditer</span>
+              <span class="settings-row-desc">L'URL normale — sans PIN, lecture seule uniquement</span>
             </span>
             <span class="settings-row-arrow">›</span>
           </button>
-          <button class="settings-row" onclick="regenerateShareToken()">
-            <span class="settings-row-icon">🔄</span>
+          <button class="settings-row" onclick="setEditPin()">
+            <span class="settings-row-icon">🔒</span>
             <span class="settings-row-text">
-              <span class="settings-row-label">Régénérer le lien</span>
-              <span class="settings-row-desc">Invalide les anciens liens partagés</span>
+              <span class="settings-row-label" id="pin-label">Définir un code PIN</span>
+              <span class="settings-row-desc" id="pin-desc">Protège l'édition — les visiteurs voient les recettes sans pouvoir modifier</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+          <button class="settings-row" id="lock-btn" onclick="lockEdit()" style="display:none">
+            <span class="settings-row-icon">🔓</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Verrouiller l'édition</span>
+              <span class="settings-row-desc">Repasser en mode lecture seule</span>
             </span>
             <span class="settings-row-arrow">›</span>
           </button>
