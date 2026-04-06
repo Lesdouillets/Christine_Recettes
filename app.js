@@ -1178,9 +1178,11 @@ function filtered() {
 function render() {
   renderSidebar();
   renderTagCloud();
+  renderQuickFilter();
   if (currentView === 'recipes') renderGrid();
   else renderPlanner();
   renderCartBadge();
+  updateFab();
 }
 
 // ── GRID ──────────────────────────────────────────────
@@ -1730,13 +1732,7 @@ function generateShoppingList() {
   saveShopItems();
 
   closeModal('ov-shop');
-  // Basculer sur la vue Courses
-  document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.view === 'shop'));
-  document.getElementById('view-recipes').style.display = 'none';
-  document.getElementById('view-planner').style.display = 'none';
-  document.getElementById('view-shop').style.display = '';
-  currentView = 'shop';
-  renderShopView();
+  switchView('shop');
   toast(`✓ ${added.length} article${added.length > 1 ? 's' : ''} ajouté${added.length > 1 ? 's' : ''} à la liste`);
 }
 
@@ -1957,25 +1953,170 @@ function initSearch() {
 }
 
 // ── NAVIGATION ────────────────────────────────────────
+const ALL_VIEWS = ['recipes', 'planner', 'shop', 'todo', 'settings'];
+
+function switchView(view) {
+  currentView = view;
+  ALL_VIEWS.forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.style.display = v === view ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-tab, .bnav-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.view === view)
+  );
+  // Masquer la recherche sur les vues non-recettes
+  const searchEl = document.querySelector('.header-search');
+  if (searchEl) searchEl.style.display = view === 'recipes' ? '' : 'none';
+
+  updateFab();
+  if (view === 'planner')  renderPlanner();
+  else if (view === 'shop')  renderShopView();
+  else if (view === 'todo')  renderTodoView();
+  else if (view === 'settings') initSettingsView();
+  else render();
+}
+
 function initNav() {
   document.querySelectorAll('.nav-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentView = btn.dataset.view;
-      document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('view-recipes').style.display = currentView === 'recipes' ? '' : 'none';
-      document.getElementById('view-planner').style.display = currentView === 'planner' ? '' : 'none';
-      document.getElementById('view-shop').style.display    = currentView === 'shop'    ? '' : 'none';
-      document.getElementById('view-todo').style.display    = currentView === 'todo'    ? '' : 'none';
-      if (currentView === 'planner') renderPlanner();
-      else if (currentView === 'shop') renderShopView();
-      else if (currentView === 'todo') renderTodoView();
-      else render();
-    });
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
   });
   document.getElementById('planner-prev').addEventListener('click', () => { weekStart = addDays(weekStart, -7); renderPlanner(); });
   document.getElementById('planner-next').addEventListener('click', () => { weekStart = addDays(weekStart,  7); renderPlanner(); });
   document.getElementById('planner-today').addEventListener('click', () => { weekStart = getMonday(new Date()); renderPlanner(); });
+}
+
+function initBottomNav() {
+  document.querySelectorAll('.bnav-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+}
+
+// ── QUICK FILTER CHIPS ────────────────────────────────
+function renderQuickFilter() {
+  const strip = document.getElementById('quick-filter-strip');
+  if (!strip) return;
+  const cats = [{ id: 'all', label: 'Toutes', emoji: '✨' }, ...Object.values(allCats())];
+  strip.innerHTML = cats.map(c =>
+    `<button class="qf-chip${activeCat === c.id ? ' active' : ''}" onclick="setQuickCat('${c.id}')">${c.emoji} ${esc(c.label)}</button>`
+  ).join('');
+}
+function setQuickCat(catId) {
+  activeCat = catId;
+  render();
+}
+
+// ── FAB ───────────────────────────────────────────────
+function updateFab() {
+  const fab = document.getElementById('fab-add');
+  if (!fab) return;
+  fab.classList.toggle('hidden', currentView !== 'recipes');
+}
+
+// ── SWIPE ENTRE ONGLETS ───────────────────────────────
+function initSwipe() {
+  const VIEWS = ['recipes', 'planner', 'todo', 'settings'];
+  let startX = 0, startY = 0;
+  const main = document.getElementById('main');
+  main.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  main.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      const idx = VIEWS.indexOf(currentView);
+      if (dx < 0 && idx < VIEWS.length - 1) switchView(VIEWS[idx + 1]);
+      else if (dx > 0 && idx > 0) switchView(VIEWS[idx - 1]);
+    }
+  }, { passive: true });
+}
+
+// ── PULL-TO-REFRESH ───────────────────────────────────
+function initPullToRefresh() {
+  const indicator = document.getElementById('ptr-indicator');
+  const main = document.getElementById('main');
+  let startY = 0, active = false;
+
+  main.addEventListener('touchstart', e => {
+    if (main.scrollTop === 0) { startY = e.touches[0].clientY; active = true; }
+  }, { passive: true });
+
+  main.addEventListener('touchmove', e => {
+    if (!active) return;
+    const dy = Math.min(e.touches[0].clientY - startY, 80);
+    if (dy > 0) {
+      indicator.style.transform = `translateX(-50%) translateY(${dy + 40}px)`;
+      indicator.style.opacity = String(Math.min(dy / 60, 1));
+    }
+  }, { passive: true });
+
+  main.addEventListener('touchend', e => {
+    if (!active) return;
+    active = false;
+    const dy = e.changedTouches[0].clientY - startY;
+    indicator.style.transition = 'transform .3s, opacity .3s';
+    indicator.style.transform = 'translateX(-50%) translateY(0)';
+    indicator.style.opacity = '0';
+    setTimeout(() => { indicator.style.transition = ''; }, 300);
+    if (dy > 60) {
+      indicator.classList.add('spinning');
+      forceLoadFromCloud();
+      setTimeout(() => indicator.classList.remove('spinning'), 1200);
+    }
+  }, { passive: true });
+}
+
+// ── SETTINGS VIEW ─────────────────────────────────────
+function initSettingsView() {
+  // Mettre à jour l'état du toggle notifications
+  const toggle = document.getElementById('notif-toggle');
+  const desc   = document.getElementById('notif-desc');
+  if (!toggle) return;
+  const perm = Notification.permission;
+  toggle.checked = perm === 'granted' && localStorage.getItem('notif-enabled') === '1';
+  if (perm === 'denied') {
+    desc.textContent = 'Notifications bloquées dans les réglages du navigateur';
+    toggle.disabled = true;
+  } else if (perm === 'granted' && toggle.checked) {
+    desc.textContent = 'Activées — rappels planning et to-do';
+  } else {
+    desc.textContent = 'Rappels planning et to-do';
+  }
+}
+
+function copyReadOnlyLink() {
+  const url = location.origin + location.pathname + '?mode=lecture';
+  navigator.clipboard.writeText(url).then(() => {
+    toast('✓ Lien copié ! Partagez-le pour une vue lecture seule.', 'success');
+  }).catch(() => {
+    prompt('Copiez ce lien :', url);
+  });
+}
+
+async function toggleNotifications(enabled) {
+  const desc = document.getElementById('notif-desc');
+  if (!enabled) {
+    localStorage.removeItem('notif-enabled');
+    if (desc) desc.textContent = 'Rappels planning et to-do';
+    return;
+  }
+  if (!('Notification' in window)) {
+    toast('Les notifications ne sont pas supportées par ce navigateur', 'error');
+    document.getElementById('notif-toggle').checked = false;
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    localStorage.setItem('notif-enabled', '1');
+    if (desc) desc.textContent = 'Activées — rappels planning et to-do';
+    toast('✓ Notifications activées !', 'success');
+  } else {
+    localStorage.removeItem('notif-enabled');
+    document.getElementById('notif-toggle').checked = false;
+    if (desc) desc.textContent = 'Notifications refusées dans le navigateur';
+    toast('Autorisez les notifications dans les réglages du navigateur', 'error');
+  }
 }
 
 // ── SIDEBAR MOBILE ────────────────────────────────────
@@ -1996,21 +2137,11 @@ function initMobileSidebar() {
   toggle.addEventListener('click', () => sidebar.classList.contains('open') ? closeSidebarFn() : openSidebar());
   overlay.addEventListener('click', closeSidebarFn);
 
-  // Navigation mobile (Recettes / Planning)
+  // Navigation mobile via sidebar
   document.querySelectorAll('.mobile-nav-item').forEach(item => {
     item.addEventListener('click', () => {
-      const view = item.dataset.mobileView;
-      currentView = view;
       document.querySelectorAll('.mobile-nav-item').forEach(i => i.classList.toggle('active', i === item));
-      document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-      document.getElementById('view-recipes').style.display = view === 'recipes' ? '' : 'none';
-      document.getElementById('view-planner').style.display = view === 'planner' ? '' : 'none';
-      document.getElementById('view-shop').style.display    = view === 'shop'    ? '' : 'none';
-      document.getElementById('view-todo').style.display    = view === 'todo'    ? '' : 'none';
-      if (view === 'planner') renderPlanner();
-      else if (view === 'shop') renderShopView();
-      else if (view === 'todo') renderTodoView();
-      else render();
+      switchView(item.dataset.mobileView);
       closeSidebarFn();
     });
   });
@@ -2368,6 +2499,9 @@ document.addEventListener('DOMContentLoaded', () => {
   loadDemo();
   initSearch();
   initNav();
+  initBottomNav();
+  initSwipe();
+  initPullToRefresh();
   initSidebarEvents();
   initMobileSidebar();
   initButtons();

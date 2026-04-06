@@ -149,6 +149,7 @@
   <main class="main" id="main">
 
     <div id="view-recipes">
+      <div class="quick-filter-strip" id="quick-filter-strip"></div>
       <div class="main-topbar">
         <h2 id="page-title">Toutes les recettes</h2>
         <span class="results-info" id="results-info"></span>
@@ -188,6 +189,121 @@
     </div>
 
     <!-- VUE TO-DO PARTAGÉE -->
+    <!-- VUE RÉGLAGES -->
+    <div id="view-settings" style="display:none">
+      <div class="main-topbar"><h2>Réglages</h2></div>
+      <div class="settings-view">
+
+        <div class="settings-section">
+          <div class="settings-section-title">Recettes</div>
+          <button class="settings-row" onclick="openImportTab('url')">
+            <span class="settings-row-icon">🔗</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Importer via URL</span>
+              <span class="settings-row-desc">Instagram, sites de recettes…</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+          <button class="settings-row" onclick="openImportTab('text')">
+            <span class="settings-row-icon">📋</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Importer via texte</span>
+              <span class="settings-row-desc">Coller une recette manuellement</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+          <button class="settings-row" onclick="openImportTab('todo')">
+            <span class="settings-row-icon">📌</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">À importer</span>
+              <span class="settings-row-desc">URLs sauvegardées pour plus tard</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+          <button class="settings-row" onclick="exportRecipes()">
+            <span class="settings-row-icon">📤</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Exporter mes recettes</span>
+              <span class="settings-row-desc">Sauvegarde en JSON</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Courses</div>
+          <button class="settings-row" onclick="switchView('shop')">
+            <span class="settings-row-icon">🛒</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Liste de courses</span>
+              <span class="settings-row-desc">Gérer mes articles</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Synchronisation</div>
+          <button class="settings-row" onclick="forceSyncToCloud()">
+            <span class="settings-row-icon">☁️</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Envoyer vers le cloud</span>
+              <span class="settings-row-desc">Pousser mes données sur tous les appareils</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+          <button class="settings-row" onclick="forceLoadFromCloud()">
+            <span class="settings-row-icon">📥</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Charger depuis le cloud</span>
+              <span class="settings-row-desc">Récupérer la dernière version synchronisée</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Personnalisation</div>
+          <button class="settings-row" onclick="openCategoryManager()">
+            <span class="settings-row-icon">🏷️</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Gérer les catégories</span>
+              <span class="settings-row-desc">Ajouter, modifier, supprimer</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Partage</div>
+          <button class="settings-row" onclick="copyReadOnlyLink()">
+            <span class="settings-row-icon">👁️</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Lien lecture seule</span>
+              <span class="settings-row-desc">Partager sans droits de modification</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Notifications</div>
+          <div class="settings-row settings-row-toggle">
+            <span class="settings-row-icon">🔔</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Activer les notifications</span>
+              <span class="settings-row-desc" id="notif-desc">Rappels planning et to-do</span>
+            </span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="notif-toggle" onchange="toggleNotifications(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <div id="view-todo" style="display:none">
       <div class="main-topbar todo-topbar">
         <h2>✅ To-do</h2>
@@ -540,6 +656,34 @@ Faire cuire dans une poêle beurrée 2 min de chaque côté."></textarea>
   </div>
 </div>
 
+
+<!-- ═══════════ FAB ═══════════ -->
+<button class="fab" id="fab-add" onclick="openAdd()" title="Nouvelle recette">+</button>
+
+<!-- ═══════════ PULL-TO-REFRESH ═══════════ -->
+<div class="ptr-indicator" id="ptr-indicator">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-9-9c2.4 0 4.6.9 6.3 2.4"/><polyline points="21 3 21 9 15 9"/></svg>
+</div>
+
+<!-- ═══════════ BOTTOM NAV (mobile) ═══════════ -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bnav-tab active" data-view="recipes">
+    <span class="bnav-icon">🍽️</span>
+    <span class="bnav-label">Recettes</span>
+  </button>
+  <button class="bnav-tab" data-view="planner">
+    <span class="bnav-icon">📅</span>
+    <span class="bnav-label">Planning</span>
+  </button>
+  <button class="bnav-tab" data-view="todo">
+    <span class="bnav-icon">✅</span>
+    <span class="bnav-label">Tout doux</span>
+  </button>
+  <button class="bnav-tab" data-view="settings">
+    <span class="bnav-icon">⚙️</span>
+    <span class="bnav-label">Réglages</span>
+  </button>
+</nav>
 
 <div id="toasts"></div>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
