@@ -1652,3 +1652,25 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .header-brand, .header-search, .header-actions { display: flex; }
   .hamburger { display: flex !important; }
 }
+
+/* ── MAISON : boutons rotation photo ─────────────────── */
+.maison-photo-actions {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(0,0,0,0.5); padding: 3px 4px;
+}
+.maison-photo-rotate {
+  background: none; border: none; color: #fff;
+  font-size: 16px; cursor: pointer; padding: 2px 5px;
+  border-radius: 4px; line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.maison-photo-rotate:active { background: rgba(255,255,255,0.2); }
+.maison-photo-del {
+  background: none; border: none; color: #fff;
+  font-size: 13px; cursor: pointer; padding: 2px 5px;
+  border-radius: 4px;
+  -webkit-tap-highlight-color: transparent;
+}
+.maison-photo-del:active { background: rgba(255,0,0,0.3); }
+.maison-photo-item img { transition: transform .25s ease; }

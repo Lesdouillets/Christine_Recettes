@@ -2102,7 +2102,9 @@ function initSwipe() {
   document.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    blocked = !!e.target.closest('.quick-filter-strip, .planner-scroll, .import-tabs, textarea, select');
+    blocked = !!e.target.closest('.quick-filter-strip, .planner-scroll, .import-tabs, select')
+           || (e.target.tagName === 'TEXTAREA')
+           || (e.target.tagName === 'INPUT' && e.target.type !== 'checkbox');
   }, { passive: true });
 
   document.addEventListener('touchend', e => {
@@ -3056,9 +3058,13 @@ function renderMaisonRoomDetail(container) {
           ${photos.length
             ? photos.map((p, i) => `
               <div class="maison-photo-item">
-                <img src="${p.url}" loading="lazy" onclick="openMaisonPhotoFull('${p.url}')">
+                <img src="${p.url}" loading="lazy" style="transform:rotate(${(p.rotation||0)}deg)" onclick="openMaisonPhotoFull('${p.url}',${(p.rotation||0)})">
                 <div class="maison-photo-item-date">${new Date(p.date).toLocaleDateString('fr-FR')}</div>
-                <button class="maison-photo-del" onclick="deleteMaisonPhoto('${room.id}',${i})" title="Supprimer">✕</button>
+                <div class="maison-photo-actions">
+                  <button class="maison-photo-rotate" onclick="rotateMaisonPhoto('${room.id}',${i},-90)" title="Tourner gauche">↺</button>
+                  <button class="maison-photo-rotate" onclick="rotateMaisonPhoto('${room.id}',${i},90)" title="Tourner droite">↻</button>
+                  <button class="maison-photo-del" onclick="deleteMaisonPhoto('${room.id}',${i})" title="Supprimer">✕</button>
+                </div>
               </div>`).join('')
             : `<div class="maison-photos-empty">${room.emoji}<br>Pas encore de photo</div>`
           }
@@ -3081,12 +3087,22 @@ function renderMaisonRoomDetail(container) {
   if (ta) ta.addEventListener('blur', () => saveMaisonNotes(room.id));
 }
 
-function openMaisonPhotoFull(url) {
+function openMaisonPhotoFull(url, rotation) {
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
-  ov.innerHTML = `<img src="${url}" style="max-width:95vw;max-height:95vh;border-radius:8px;object-fit:contain">`;
+  ov.innerHTML = `<img src="${url}" style="max-width:95vw;max-height:95vh;border-radius:8px;object-fit:contain;transform:rotate(${rotation||0}deg)">`;
   ov.onclick = () => document.body.removeChild(ov);
   document.body.appendChild(ov);
+}
+
+function rotateMaisonPhoto(roomId, index, deg) {
+  const room = maisonRooms.find(r => r.id === roomId);
+  if (!room || !room.photos[index]) return;
+  room.photos[index].rotation = ((room.photos[index].rotation || 0) + deg + 360) % 360;
+  saveMaison();
+  // Mise à jour visuelle immédiate sans re-render complet
+  const img = document.querySelector(`#maison-photos-grid-${roomId} .maison-photo-item:nth-child(${index+1}) img`);
+  if (img) img.style.transform = `rotate(${room.photos[index].rotation}deg)`;
 }
 
 function openMaisonRoom(roomId) {
