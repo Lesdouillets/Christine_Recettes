@@ -2087,12 +2087,19 @@ function initPullToRefresh() {
   let startY = 0, active = false;
 
   main.addEventListener('touchstart', e => {
-    if (currentView === 'recipes' && main.scrollTop === 0) { startY = e.touches[0].clientY; active = true; }
-    else active = false;
+    if (currentView === 'recipes' && main.scrollTop === 0) {
+      startY = e.touches[0].clientY;
+      active = true;
+    } else {
+      active = false;
+      // S'assurer que l'indicateur est invisible si on est hors recettes
+      indicator.style.opacity = '0';
+      indicator.style.transform = 'translateX(-50%) translateY(0)';
+    }
   }, { passive: true });
 
   main.addEventListener('touchmove', e => {
-    if (!active) return;
+    if (!active || currentView !== 'recipes') return;
     const dy = Math.min(e.touches[0].clientY - startY, 80);
     if (dy > 0) {
       indicator.style.transform = `translateX(-50%) translateY(${dy + 40}px)`;
@@ -2108,7 +2115,7 @@ function initPullToRefresh() {
     indicator.style.transform = 'translateX(-50%) translateY(0)';
     indicator.style.opacity = '0';
     setTimeout(() => { indicator.style.transition = ''; }, 300);
-    if (dy > 60) {
+    if (dy > 60 && currentView === 'recipes') {
       indicator.classList.add('spinning');
       forceLoadFromCloud();
       setTimeout(() => indicator.classList.remove('spinning'), 1200);
@@ -2842,17 +2849,48 @@ const DEFAULT_ROOMS = [
 let maisonRooms     = null;  // [{ id, name, emoji, photo, notes }]
 let maisonLoaded    = false;
 
+// IDs de toutes les anciennes versions de pièces par défaut (à remplacer)
+const OLD_DEFAULT_IDS = new Set([
+  'chambre', 'garde-manger', 'garde-robe', 'salle-bain', 'salon',
+  'chambre-enfant', 'sdb-enfant', 'chambre-parents', 'sdb-parents', 'cuisine',
+  'chambre-enfants', 'sdb-enfants'
+]);
+const NEW_DEFAULT_IDS = new Set(DEFAULT_ROOMS.map(r => r.id));
+
+function migrateMaisonRooms(rooms) {
+  // 1. Migration format photo : string → array
+  rooms = rooms.map(r => ({
+    ...r,
+    photos: r.photos || (r.photo ? [{ url: r.photo, date: r.photoDate || Date.now() }] : [])
+  }));
+
+  // 2. Migration des pièces par défaut : garder uniquement les nouvelles IDs + les custom (room-*)
+  const customRooms = rooms.filter(r => r.id.startsWith('room-'));
+  const existingById = Object.fromEntries(rooms.map(r => [r.id, r]));
+
+  // Construire la liste finale : nouvelles pièces par défaut (avec data existante si dispo) + custom
+  const newRooms = DEFAULT_ROOMS.map(def => ({
+    ...def,
+    photos: existingById[def.id]?.photos || [],
+    notes:  existingById[def.id]?.notes  || ''
+  }));
+
+  const changed = JSON.stringify(newRooms.map(r=>r.id)) !== JSON.stringify(rooms.filter(r=>!r.id.startsWith('room-')).map(r=>r.id))
+               || rooms.some(r => !r.photos);
+
+  return { rooms: [...newRooms, ...customRooms], changed };
+}
+
 function loadMaison() {
   MAISON_STORE.get().then(snap => {
     if (snap.exists) {
       const d = snap.data();
-      // Migration : ancien format (photo string) → nouveau (photos array)
-      maisonRooms = (d.rooms || []).map(r => ({
-        ...r,
-        photos: r.photos || (r.photo ? [{ url: r.photo, date: r.photoDate || Date.now() }] : [])
-      }));
+      const { rooms, changed } = migrateMaisonRooms(d.rooms || []);
+      maisonRooms = rooms;
+      if (changed) saveMaison(); // réécrire Firebase avec les nouvelles pièces
     } else {
       maisonRooms = DEFAULT_ROOMS.map(r => ({ ...r, photos: [], notes: '' }));
+      saveMaison();
     }
     maisonLoaded = true;
     if (currentView === 'maison') renderMaisonView();
