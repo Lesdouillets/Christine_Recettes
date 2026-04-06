@@ -35,10 +35,13 @@
   </div>
 
   <nav class="header-nav">
-    <button class="nav-tab active" data-view="recipes">Recettes</button>
-    <button class="nav-tab" data-view="planner">Planning</button>
-    <button class="nav-tab" data-view="shop">🛒 Courses</button>
+    <button class="nav-tab" data-view="home">🏠 Accueil</button>
+    <button class="nav-tab active" data-view="recipes">🍽️ Recettes</button>
+    <button class="nav-tab" data-view="planner">📅 Planning</button>
     <button class="nav-tab" data-view="todo">✅ To-do</button>
+    <button class="nav-tab" data-view="shop">🛒 Courses</button>
+    <button class="nav-tab" data-view="maison">🏡 Maison</button>
+    <button class="nav-tab" data-view="settings">⚙️ Réglages</button>
   </nav>
 
   <div class="header-search">
@@ -144,6 +147,11 @@
   <!-- MAIN -->
   <main class="main" id="main">
 
+    <!-- VUE ACCUEIL (desktop) -->
+    <div id="view-home" style="display:none">
+      <div id="home-container"></div>
+    </div>
+
     <div id="view-recipes">
       <div class="quick-filter-strip" id="quick-filter-strip"></div>
       <div class="main-topbar">
@@ -189,6 +197,18 @@
     <div id="view-settings" style="display:none">
       <div class="main-topbar"><h2>Réglages</h2></div>
       <div class="settings-view">
+
+        <div class="settings-section">
+          <div class="settings-section-title">🏡 Maison secondaire</div>
+          <button class="settings-row" onclick="switchView('maison')">
+            <span class="settings-row-icon">🏡</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Inventaire des pièces</span>
+              <span class="settings-row-desc">Photos et contenu de chaque pièce</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+        </div>
 
         <div class="settings-section">
           <div class="settings-section-title">Recettes</div>
@@ -271,24 +291,20 @@
         </div>
 
         <div class="settings-section">
-          <div class="settings-section-title">Maison secondaire</div>
-          <button class="settings-row" onclick="switchView('maison')">
-            <span class="settings-row-icon">🏡</span>
+          <div class="settings-section-title">Partage</div>
+          <button class="settings-row" onclick="copyReadOnlyLink()">
+            <span class="settings-row-icon">🔗</span>
             <span class="settings-row-text">
-              <span class="settings-row-label">Inventaire</span>
-              <span class="settings-row-desc">Photos et contenu de chaque pièce</span>
+              <span class="settings-row-label">Copier le lien de partage</span>
+              <span class="settings-row-desc">Lien unique — lecture seule, impossible d'éditer</span>
             </span>
             <span class="settings-row-arrow">›</span>
           </button>
-        </div>
-
-        <div class="settings-section">
-          <div class="settings-section-title">Partage</div>
-          <button class="settings-row" onclick="copyReadOnlyLink()">
-            <span class="settings-row-icon">👁️</span>
+          <button class="settings-row" onclick="regenerateShareToken()">
+            <span class="settings-row-icon">🔄</span>
             <span class="settings-row-text">
-              <span class="settings-row-label">Lien lecture seule</span>
-              <span class="settings-row-desc">Partager sans droits de modification</span>
+              <span class="settings-row-label">Régénérer le lien</span>
+              <span class="settings-row-desc">Invalide les anciens liens partagés</span>
             </span>
             <span class="settings-row-arrow">›</span>
           </button>

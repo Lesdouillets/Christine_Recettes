@@ -61,8 +61,25 @@ const STORE   = db.collection('data').doc('main');
 const PHOTOS  = db.collection('photos'); // chaque doc = { photo: "data:..." } pour un recipeId
 let _ownWrite = false; // évite re-render inutile sur notre propre écriture
 
+// ── TOKEN DE PARTAGE SÉCURISÉ ─────────────────────────
+function getOrCreateShareToken() {
+  let t = localStorage.getItem('share-token');
+  if (!t) {
+    t = Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    localStorage.setItem('share-token', t);
+  }
+  return t;
+}
+function regenerateShareToken() {
+  localStorage.removeItem('share-token');
+  getOrCreateShareToken();
+  toast('✓ Nouveau lien généré — les anciens liens ne fonctionnent plus.', 'success');
+}
+
 // ── MODE LECTURE ───────────────────────────────────────
-const LECTURE_MODE = new URLSearchParams(location.search).get('mode') === 'lecture';
+const _urlP = new URLSearchParams(location.search);
+// ?v=TOKEN (nouveau format sécurisé) OU ?mode=lecture (rétro-compat)
+const LECTURE_MODE = !!_urlP.get('v') || _urlP.get('mode') === 'lecture';
 if (LECTURE_MODE) document.documentElement.classList.add('lecture-mode');
 
 // ── ÉTAT ──────────────────────────────────────────────
@@ -1954,7 +1971,7 @@ function initSearch() {
 }
 
 // ── NAVIGATION ────────────────────────────────────────
-const ALL_VIEWS = ['recipes', 'planner', 'shop', 'todo', 'settings', 'maison'];
+const ALL_VIEWS = ['home', 'recipes', 'planner', 'shop', 'todo', 'settings', 'maison'];
 
 function switchView(view) {
   currentView = view;
@@ -1970,11 +1987,12 @@ function switchView(view) {
   if (searchEl) searchEl.style.display = view === 'recipes' ? '' : 'none';
 
   updateFab();
-  if (view === 'planner')  renderPlanner();
-  else if (view === 'shop')  renderShopView();
-  else if (view === 'todo')  renderTodoView();
+  if (view === 'home')         renderHomeView();
+  else if (view === 'planner') renderPlanner();
+  else if (view === 'shop')    renderShopView();
+  else if (view === 'todo')    renderTodoView();
   else if (view === 'settings') initSettingsView();
-  else if (view === 'maison') renderMaisonView();
+  else if (view === 'maison')  renderMaisonView();
   else render();
 }
 
@@ -2014,32 +2032,50 @@ function updateFab() {
   fab.classList.toggle('hidden', currentView !== 'recipes');
 }
 
-// ── SWIPE ENTRE ONGLETS ───────────────────────────────
+// ── SWIPE NAVIGATION + RETOUR ARRIÈRE ────────────────
 function initSwipe() {
-  const VIEWS = ['recipes', 'planner', 'todo', 'shop', 'settings'];
+  const TAB_VIEWS = ['recipes', 'planner', 'todo', 'shop', 'settings'];
   let startX = 0, startY = 0, blocked = false;
-  const main = document.getElementById('main');
-  main.addEventListener('touchstart', e => {
+
+  document.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    blocked = !!e.target.closest('.quick-filter-strip, .planner-scroll, .import-tabs');
+    blocked = !!e.target.closest('.quick-filter-strip, .planner-scroll, .import-tabs, textarea, select');
   }, { passive: true });
-  main.addEventListener('touchend', e => {
+
+  document.addEventListener('touchend', e => {
     if (blocked) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      // Vue maison : swipe gauche (dx < 0) = retour arrière
+    if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+    if (dx < 0) {
+      // ← swipe gauche = retour arrière (si sous-vue) ou onglet suivant
+      // Priorité 1 : modal/overlay ouverte → fermer
+      const openModal = document.querySelector('.overlay.open');
+      if (openModal) { openModal.classList.remove('open'); return; }
+
+      // Priorité 2 : sous-vue active
       if (currentView === 'maison') {
-        if (dx < 0) {
-          if (activeRoomId) { activeRoomId = null; renderMaisonView(); }
-          else switchView('settings');
-        }
+        if (activeRoomId) { activeRoomId = null; renderMaisonView(); }
+        else switchView('settings');
         return;
       }
-      const idx = VIEWS.indexOf(currentView);
-      if (dx < 0 && idx < VIEWS.length - 1) switchView(VIEWS[idx + 1]);
-      else if (dx > 0 && idx > 0) switchView(VIEWS[idx - 1]);
+      if (currentView === 'todo' && activeTodoListId) {
+        activeTodoListId = null; renderTodoView(); return;
+      }
+
+      // Priorité 3 : onglet suivant dans la liste
+      const idx = TAB_VIEWS.indexOf(currentView);
+      if (idx >= 0 && idx < TAB_VIEWS.length - 1) switchView(TAB_VIEWS[idx + 1]);
+
+    } else {
+      // → swipe droit = onglet précédent (pas dans sous-vue ni modal)
+      const openModal = document.querySelector('.overlay.open');
+      if (openModal) return;
+      if (currentView === 'maison' || (currentView === 'todo' && activeTodoListId)) return;
+      const idx = TAB_VIEWS.indexOf(currentView);
+      if (idx > 0) switchView(TAB_VIEWS[idx - 1]);
     }
   }, { passive: true });
 }
@@ -2051,7 +2087,8 @@ function initPullToRefresh() {
   let startY = 0, active = false;
 
   main.addEventListener('touchstart', e => {
-    if (main.scrollTop === 0) { startY = e.touches[0].clientY; active = true; }
+    if (currentView === 'recipes' && main.scrollTop === 0) { startY = e.touches[0].clientY; active = true; }
+    else active = false;
   }, { passive: true });
 
   main.addEventListener('touchmove', e => {
@@ -2098,11 +2135,12 @@ function initSettingsView() {
 }
 
 function copyReadOnlyLink() {
-  const url = location.origin + location.pathname + '?mode=lecture';
+  const token = getOrCreateShareToken();
+  const url = location.origin + location.pathname + '?v=' + token;
   navigator.clipboard.writeText(url).then(() => {
-    toast('✓ Lien copié ! Partagez-le pour une vue lecture seule.', 'success');
+    toast('✓ Lien copié ! Ce lien unique ne permet que la lecture.', 'success');
   }).catch(() => {
-    prompt('Copiez ce lien :', url);
+    prompt('Copiez ce lien de partage :', url);
   });
 }
 
@@ -2518,6 +2556,7 @@ function renderTodoListDetail(container) {
           `<button class="todo-assign-btn${todoListAssignee===k?' active':''}" onclick="setTodoAssignee('${k}')">${a.emoji}</button>`
         ).join('')}
       </div>
+      <input id="todo-item-due" type="date" class="todo-due-input" title="Échéance (optionnel)">
       <button class="btn btn-primary btn-sm" onclick="addTodoListItem()">+</button>
     </div>
     <div id="todo-items-container">
@@ -2562,9 +2601,18 @@ function renderFlatItems(list, items) {
 
 function renderTaskHtml(listId, item) {
   const a = ASSIGNEES[item.assignee] || ASSIGNEES.nous;
+  let dueBadge = '';
+  if (item.dueDate && !item.done) {
+    const due = new Date(item.dueDate);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const isOverdue = due < today;
+    const isSoon = !isOverdue && (due - today) <= 2 * 86400000;
+    const label = due.toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
+    dueBadge = `<span class="todo-due${isOverdue?' overdue':isSoon?' soon':''}">${isOverdue ? '⚠️ ' : '📅 '}${label}</span>`;
+  }
   return `<div class="todo-task${item.done ? ' done' : ''}" style="--task-color:${a.color}">
     <input type="checkbox" id="ti-${item.id}" ${item.done ? 'checked' : ''} onchange="toggleTodoListItem('${listId}','${item.id}')">
-    <label for="ti-${item.id}">${esc(item.title)}</label>
+    <label for="ti-${item.id}">${esc(item.title)}${dueBadge}</label>
     <button class="todo-task-del" onclick="removeTodoListItem('${listId}','${item.id}')">✕</button>
   </div>`;
 }
@@ -2600,7 +2648,9 @@ function addTodoListItem() {
   if (!list) return;
   const catEl = document.getElementById('todo-item-cat');
   const category = catEl?.value || '';
-  list.items.unshift({ id: String(Date.now()), title, category, assignee: todoListAssignee, done: false, createdAt: Date.now() });
+  const dueEl = document.getElementById('todo-item-due');
+  const dueDate = dueEl?.value || null; // 'YYYY-MM-DD' ou null
+  list.items.unshift({ id: String(Date.now()), title, category, assignee: todoListAssignee, done: false, createdAt: Date.now(), dueDate });
   saveTodoLists(); renderTodoView();
   document.getElementById('todo-item-input')?.focus();
 }
@@ -2711,15 +2761,82 @@ function loadDemo() {
   save();
 }
 
+// ── HOME (BUREAU) ─────────────────────────────────────
+function renderHomeView() {
+  const container = document.getElementById('home-container');
+  if (!container) return;
+  const homePhoto = localStorage.getItem('home-photo') || '';
+  const recipeCount = recipes.length;
+  const pendingTodo = todoLists.reduce((s,l) => s + l.items.filter(i => !i.done).length, 0);
+  container.innerHTML = `
+    <div class="home-hero" id="home-hero" style="${homePhoto ? `background-image:url('${homePhoto}')` : ''}">
+      <div class="home-hero-overlay">
+        <h1 class="home-title">🍪 Mes Recettes</h1>
+        <p class="home-subtitle">Bonne cuisine, bien organisée</p>
+      </div>
+      <label class="home-hero-change-btn" title="Changer la photo de fond">
+        📷
+        <input type="file" accept="image/*" style="display:none" onchange="changeHomePhoto(event)">
+      </label>
+    </div>
+    <div class="home-cards">
+      <button class="home-card" onclick="switchView('recipes')">
+        <span class="home-card-icon">🍽️</span>
+        <span class="home-card-label">Recettes</span>
+        <span class="home-card-sub">${recipeCount} recette${recipeCount > 1 ? 's' : ''}</span>
+      </button>
+      <button class="home-card" onclick="switchView('planner')">
+        <span class="home-card-icon">📅</span>
+        <span class="home-card-label">Planning</span>
+        <span class="home-card-sub">Semaine en cours</span>
+      </button>
+      <button class="home-card" onclick="switchView('todo')">
+        <span class="home-card-icon">✅</span>
+        <span class="home-card-label">To-do</span>
+        <span class="home-card-sub">${pendingTodo} tâche${pendingTodo > 1 ? 's' : ''} en cours</span>
+      </button>
+      <button class="home-card" onclick="switchView('shop')">
+        <span class="home-card-icon">🛒</span>
+        <span class="home-card-label">Courses</span>
+        <span class="home-card-sub">Liste de courses</span>
+      </button>
+      <button class="home-card" onclick="switchView('maison')">
+        <span class="home-card-icon">🏡</span>
+        <span class="home-card-label">Maison</span>
+        <span class="home-card-sub">Inventaire</span>
+      </button>
+      <button class="home-card" onclick="switchView('settings')">
+        <span class="home-card-icon">⚙️</span>
+        <span class="home-card-label">Réglages</span>
+        <span class="home-card-sub">Paramètres</span>
+      </button>
+    </div>
+  `;
+}
+
+async function changeHomePhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  toast('⏳ Upload…');
+  try {
+    const url = await uploadToCloudinary(file);
+    localStorage.setItem('home-photo', url);
+    renderHomeView();
+    toast('✓ Photo mise à jour !', 'success');
+  } catch(e) {
+    toast('Erreur upload : ' + e.message, 'error');
+  }
+}
+
 // ── MAISON SECONDAIRE ─────────────────────────────────
 const MAISON_STORE = db.collection('data').doc('maison');
 
 const DEFAULT_ROOMS = [
-  { id: 'cuisine',         name: 'Cuisine',            emoji: '🍳' },
-  { id: 'chambre-parents', name: 'Chambre parents',    emoji: '🛏️' },
-  { id: 'chambre-enfant',  name: 'Chambre enfant',     emoji: '🧒' },
-  { id: 'sdb-parents',     name: 'Salle de bain parents', emoji: '🚿' },
-  { id: 'sdb-enfant',      name: 'Salle de bain enfant',  emoji: '🛁' },
+  { id: 'chambre-enfants',  name: 'Chambre enfants',         emoji: '🧒' },
+  { id: 'sdb-enfants',      name: 'Salle de bain enfants',   emoji: '🛁' },
+  { id: 'chambre-parents',  name: 'Chambre parents',         emoji: '🛏️' },
+  { id: 'sdb-parents',      name: 'Salle de bain parents',   emoji: '🚿' },
+  { id: 'cuisine',          name: 'Cuisine',                 emoji: '🍳' },
 ];
 
 let maisonRooms     = null;  // [{ id, name, emoji, photo, notes }]
@@ -2729,14 +2846,18 @@ function loadMaison() {
   MAISON_STORE.get().then(snap => {
     if (snap.exists) {
       const d = snap.data();
-      maisonRooms = d.rooms || [];
+      // Migration : ancien format (photo string) → nouveau (photos array)
+      maisonRooms = (d.rooms || []).map(r => ({
+        ...r,
+        photos: r.photos || (r.photo ? [{ url: r.photo, date: r.photoDate || Date.now() }] : [])
+      }));
     } else {
-      maisonRooms = DEFAULT_ROOMS.map(r => ({ ...r, photo: '', notes: '' }));
+      maisonRooms = DEFAULT_ROOMS.map(r => ({ ...r, photos: [], notes: '' }));
     }
     maisonLoaded = true;
     if (currentView === 'maison') renderMaisonView();
   }).catch(() => {
-    maisonRooms = DEFAULT_ROOMS.map(r => ({ ...r, photo: '', notes: '' }));
+    maisonRooms = DEFAULT_ROOMS.map(r => ({ ...r, photos: [], notes: '' }));
     maisonLoaded = true;
     if (currentView === 'maison') renderMaisonView();
   });
@@ -2769,18 +2890,24 @@ function renderMaisonHome(container) {
       <h2>Maison secondaire</h2>
     </div>
     <div class="maison-rooms">
-      ${maisonRooms.map(r => `
+      ${maisonRooms.map(r => {
+        const thumb = r.photos && r.photos.length ? r.photos[r.photos.length - 1].url : null;
+        return `
         <button class="maison-room-card" onclick="openMaisonRoom('${r.id}')">
-          ${r.photo
-            ? `<img class="maison-room-thumb" src="${r.photo}" alt="${r.name}" loading="lazy">`
+          ${thumb
+            ? `<img class="maison-room-thumb" src="${thumb}" alt="${r.name}" loading="lazy">`
             : `<div class="maison-room-placeholder">${r.emoji}</div>`
           }
           <div class="maison-room-info">
             <span class="maison-room-name">${r.emoji} ${r.name}</span>
-            ${r.notes ? `<span class="maison-room-preview">${r.notes.split('\n')[0].slice(0, 60)}</span>` : '<span class="maison-room-preview" style="color:var(--text-3)">Aucune note</span>'}
+            ${r.photos && r.photos.length
+              ? `<span class="maison-room-preview">${r.photos.length} photo${r.photos.length > 1 ? 's' : ''} · ${new Date(r.photos[r.photos.length-1].date).toLocaleDateString('fr-FR')}</span>`
+              : (r.notes ? `<span class="maison-room-preview">${r.notes.split('\n')[0].slice(0, 50)}</span>` : '<span class="maison-room-preview" style="color:var(--text-3)">Aucune photo</span>')
+            }
           </div>
-        </button>
-      `).join('')}
+          <span style="color:var(--text-3);font-size:18px">›</span>
+        </button>`;
+      }).join('')}
       <button class="maison-add-room" onclick="addMaisonRoom()">
         <span style="font-size:22px">＋</span>
         <span>Ajouter une pièce</span>
@@ -2792,6 +2919,7 @@ function renderMaisonHome(container) {
 function renderMaisonRoomDetail(container) {
   const room = maisonRooms.find(r => r.id === activeRoomId);
   if (!room) { activeRoomId = null; renderMaisonHome(container); return; }
+  const photos = room.photos || [];
   container.innerHTML = `
     <div class="maison-topbar">
       <button class="back-btn" onclick="activeRoomId=null;renderMaisonView()">‹ Maison</button>
@@ -2799,32 +2927,45 @@ function renderMaisonRoomDetail(container) {
       <button class="maison-delete-btn" onclick="deleteMaisonRoom('${room.id}')" title="Supprimer">🗑️</button>
     </div>
     <div class="maison-room-detail">
-      <div class="maison-photo-section">
-        ${room.photo
-          ? `<img class="maison-room-photo" src="${room.photo}" alt="${room.name}">`
-          : `<div class="maison-room-empty-photo">${room.emoji}<br><span>Pas encore de photo</span></div>`
-        }
+
+      <!-- Zone photos -->
+      <div class="maison-photos-section">
+        <div class="maison-photos-label">📷 Photos (${photos.length})</div>
+        <div class="maison-photos-grid" id="maison-photos-grid-${room.id}">
+          ${photos.length
+            ? photos.map((p, i) => `
+              <div class="maison-photo-item">
+                <img src="${p.url}" loading="lazy" onclick="openMaisonPhotoFull('${p.url}')">
+                <div class="maison-photo-item-date">${new Date(p.date).toLocaleDateString('fr-FR')}</div>
+                <button class="maison-photo-del" onclick="deleteMaisonPhoto('${room.id}',${i})" title="Supprimer">✕</button>
+              </div>`).join('')
+            : `<div class="maison-photos-empty">${room.emoji}<br>Pas encore de photo</div>`
+          }
+        </div>
         <label class="maison-photo-btn">
-          📷 ${room.photo ? 'Changer la photo' : 'Ajouter une photo'}
-          <input type="file" accept="image/*" style="display:none" onchange="uploadMaisonPhoto(event,'${room.id}')">
+          📷 Ajouter une photo
+          <input type="file" accept="image/*" capture="environment" style="display:none" onchange="uploadMaisonPhoto(event,'${room.id}')">
         </label>
-        ${room.photoDate ? `<div class="maison-photo-date">Dernière mise à jour : ${new Date(room.photoDate).toLocaleDateString('fr-FR')}</div>` : ''}
       </div>
+
+      <!-- Notes / inventaire -->
       <div class="maison-notes-section">
-        <div class="maison-notes-label">📝 Contenu / inventaire</div>
-        <textarea class="maison-notes-input" id="maison-notes-${room.id}" placeholder="Ex:\n- Pyjamas été (x2)\n- Pull marine\n- Riz, pâtes, boîtes de thon\n..."
-        >${room.notes || ''}</textarea>
+        <div class="maison-notes-label">📝 Inventaire / notes</div>
+        <textarea class="maison-notes-input" id="maison-notes-${room.id}" placeholder="Ex:\n- Pyjamas été (x2)\n- Pull marine\n- Riz, pâtes, boîtes de thon\n…">${room.notes || ''}</textarea>
         <button class="maison-save-notes-btn" onclick="saveMaisonNotes('${room.id}')">✓ Enregistrer</button>
       </div>
-      ${room.photo ? `
-      <div class="maison-hint">
-        💡 <strong>Astuce :</strong> Fais une photo de ta pièce à chaque passage pour garder un inventaire visuel à jour.
-      </div>` : ''}
     </div>
   `;
-  // Auto-save on textarea blur
   const ta = document.getElementById(`maison-notes-${room.id}`);
   if (ta) ta.addEventListener('blur', () => saveMaisonNotes(room.id));
+}
+
+function openMaisonPhotoFull(url) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  ov.innerHTML = `<img src="${url}" style="max-width:95vw;max-height:95vh;border-radius:8px;object-fit:contain">`;
+  ov.onclick = () => document.body.removeChild(ov);
+  document.body.appendChild(ov);
 }
 
 function openMaisonRoom(roomId) {
@@ -2840,14 +2981,23 @@ async function uploadMaisonPhoto(event, roomId) {
   toast('⏳ Upload en cours…');
   try {
     const url = await uploadToCloudinary(file);
-    room.photo = url;
-    room.photoDate = Date.now();
+    if (!room.photos) room.photos = [];
+    room.photos.push({ url, date: Date.now() });
     saveMaison();
     renderMaisonView();
-    toast('✓ Photo mise à jour !', 'success');
+    toast('✓ Photo ajoutée !', 'success');
   } catch(e) {
     toast('Erreur upload : ' + e.message, 'error');
   }
+}
+
+function deleteMaisonPhoto(roomId, index) {
+  const room = maisonRooms.find(r => r.id === roomId);
+  if (!room || !room.photos) return;
+  if (!confirm('Supprimer cette photo ?')) return;
+  room.photos.splice(index, 1);
+  saveMaison();
+  renderMaisonView();
 }
 
 function saveMaisonNotes(roomId) {
@@ -2895,6 +3045,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initImportTabs();
   initTodoUI();
   renderCatSelect();
-  render();
   loadMaison();
+  // Sur desktop, démarrer sur la Home ; sur mobile, démarrer sur les recettes
+  if (window.innerWidth > 768 && !LECTURE_MODE) {
+    switchView('home');
+  } else {
+    render();
+  }
 });
