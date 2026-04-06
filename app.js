@@ -1986,6 +1986,15 @@ function switchView(view) {
   const searchEl = document.querySelector('.header-search');
   if (searchEl) searchEl.style.display = view === 'recipes' ? '' : 'none';
 
+  // Sur desktop, masquer la sidebar si on n'est pas sur recettes
+  const sidebar = document.getElementById('sidebar');
+  const appBody = document.querySelector('.app-body');
+  if (sidebar && window.innerWidth > 768) {
+    const show = view === 'recipes';
+    sidebar.style.display = show ? '' : 'none';
+    if (appBody) appBody.classList.toggle('sidebar-hidden', !show);
+  }
+
   if (view !== 'recipes') resetPullToRefresh();
   updateFab();
   if (view === 'planner') renderPlanner();

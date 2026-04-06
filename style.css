@@ -230,6 +230,11 @@ button { font-family: inherit; cursor: pointer; }
   height: calc(100vh - var(--header-h));
   overflow: hidden;
 }
+/* Sidebar masquée sur desktop (vues hors recettes) */
+@media (min-width: 769px) {
+  .app-body.sidebar-hidden .sidebar { display: none; }
+  .app-body.sidebar-hidden .main { padding: 24px 48px; }
+}
 
 /* ── SIDEBAR OVERLAY (mobile) ──────────────────────────── */
 .sidebar-overlay {
