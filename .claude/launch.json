@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "mes-recettes",
-      "runtimeExecutable": "/usr/bin/python3",
-      "runtimeArgs": ["-m", "http.server", "3000"],
+      "runtimeExecutable": "/tmp/serve-recettes.sh",
+      "runtimeArgs": [],
       "port": 3000
     }
   ]

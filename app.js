@@ -1187,7 +1187,8 @@ function render() {
 
 // ── GRID ──────────────────────────────────────────────
 function renderGrid() {
-  const list = filtered().sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+  const toTs = r => { const d = r.updatedAt || r.createdAt || r.dateAdded; return d ? (typeof d === 'number' ? d : new Date(d).getTime()) : 0; };
+  const list = filtered().sort((a, b) => toTs(b) - toTs(a));
   const container = document.getElementById('grid');
 
   document.getElementById('page-title').textContent =
@@ -1953,7 +1954,7 @@ function initSearch() {
 }
 
 // ── NAVIGATION ────────────────────────────────────────
-const ALL_VIEWS = ['recipes', 'planner', 'shop', 'todo', 'settings'];
+const ALL_VIEWS = ['recipes', 'planner', 'shop', 'todo', 'settings', 'maison'];
 
 function switchView(view) {
   currentView = view;
@@ -1973,6 +1974,7 @@ function switchView(view) {
   else if (view === 'shop')  renderShopView();
   else if (view === 'todo')  renderTodoView();
   else if (view === 'settings') initSettingsView();
+  else if (view === 'maison') renderMaisonView();
   else render();
 }
 
@@ -2426,6 +2428,15 @@ function initTodoSync() {
       const remoteTotal = d.lists.reduce((s, l) => s + l.items.length, 0);
       const localTotal  = todoLists.reduce((s, l) => s + l.items.length, 0);
       if (remoteTotal >= localTotal) {
+        // Détecter les nouvelles tâches pour les notifications
+        if (remoteTotal > localTotal && Notification.permission === 'granted' && localStorage.getItem('notif-enabled') === '1') {
+          const localIds = new Set(todoLists.flatMap(l => l.items.map(i => i.id)));
+          const newItems = d.lists.flatMap(l => l.items).filter(i => !localIds.has(i.id));
+          newItems.forEach(i => {
+            const listName = d.lists.find(l => l.items.some(x => x.id === i.id))?.name || 'To-do';
+            new Notification(`${listName}`, { body: i.title, icon: 'icon-192.png' });
+          });
+        }
         todoLists = d.lists;
         try { localStorage.setItem('mes-todo-lists', JSON.stringify(todoLists)); } catch(e) {}
         if (currentView === 'todo') renderTodoView();
@@ -2693,6 +2704,173 @@ function loadDemo() {
   save();
 }
 
+// ── MAISON SECONDAIRE ─────────────────────────────────
+const MAISON_STORE = db.collection('data').doc('maison');
+
+const DEFAULT_ROOMS = [
+  { id: 'cuisine',      name: 'Cuisine',       emoji: '🍳' },
+  { id: 'chambre',      name: 'Chambre',       emoji: '🛏️' },
+  { id: 'garde-manger', name: 'Garde-manger',  emoji: '🥫' },
+  { id: 'garde-robe',   name: 'Garde-robe',    emoji: '👗' },
+  { id: 'salle-bain',   name: 'Salle de bain', emoji: '🚿' },
+  { id: 'salon',        name: 'Salon',         emoji: '🛋️' },
+];
+
+let maisonRooms     = null;  // [{ id, name, emoji, photo, notes }]
+let maisonLoaded    = false;
+
+function loadMaison() {
+  MAISON_STORE.get().then(snap => {
+    if (snap.exists) {
+      const d = snap.data();
+      maisonRooms = d.rooms || [];
+    } else {
+      maisonRooms = DEFAULT_ROOMS.map(r => ({ ...r, photo: '', notes: '' }));
+    }
+    maisonLoaded = true;
+    if (currentView === 'maison') renderMaisonView();
+  }).catch(() => {
+    maisonRooms = DEFAULT_ROOMS.map(r => ({ ...r, photo: '', notes: '' }));
+    maisonLoaded = true;
+    if (currentView === 'maison') renderMaisonView();
+  });
+}
+
+function saveMaison() {
+  if (!maisonRooms) return;
+  MAISON_STORE.set({ rooms: maisonRooms, updatedAt: Date.now() })
+    .catch(e => console.warn('maison save:', e));
+}
+
+let activeRoomId = null;  // null = liste des pièces, sinon id pièce
+
+function renderMaisonView() {
+  const container = document.getElementById('maison-container');
+  if (!container) return;
+  if (!maisonLoaded) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3)">Chargement…</div>';
+    loadMaison();
+    return;
+  }
+  if (activeRoomId) renderMaisonRoomDetail(container);
+  else renderMaisonHome(container);
+}
+
+function renderMaisonHome(container) {
+  container.innerHTML = `
+    <div class="maison-topbar">
+      <button class="back-btn" onclick="switchView('settings')">‹ Réglages</button>
+      <h2>Maison secondaire</h2>
+    </div>
+    <div class="maison-rooms">
+      ${maisonRooms.map(r => `
+        <button class="maison-room-card" onclick="openMaisonRoom('${r.id}')">
+          ${r.photo
+            ? `<img class="maison-room-thumb" src="${r.photo}" alt="${r.name}" loading="lazy">`
+            : `<div class="maison-room-placeholder">${r.emoji}</div>`
+          }
+          <div class="maison-room-info">
+            <span class="maison-room-name">${r.emoji} ${r.name}</span>
+            ${r.notes ? `<span class="maison-room-preview">${r.notes.split('\n')[0].slice(0, 60)}</span>` : '<span class="maison-room-preview" style="color:var(--text-3)">Aucune note</span>'}
+          </div>
+        </button>
+      `).join('')}
+      <button class="maison-add-room" onclick="addMaisonRoom()">
+        <span style="font-size:22px">＋</span>
+        <span>Ajouter une pièce</span>
+      </button>
+    </div>
+  `;
+}
+
+function renderMaisonRoomDetail(container) {
+  const room = maisonRooms.find(r => r.id === activeRoomId);
+  if (!room) { activeRoomId = null; renderMaisonHome(container); return; }
+  container.innerHTML = `
+    <div class="maison-topbar">
+      <button class="back-btn" onclick="activeRoomId=null;renderMaisonView()">‹ Maison</button>
+      <h2>${room.emoji} ${room.name}</h2>
+      <button class="maison-delete-btn" onclick="deleteMaisonRoom('${room.id}')" title="Supprimer">🗑️</button>
+    </div>
+    <div class="maison-room-detail">
+      <div class="maison-photo-section">
+        ${room.photo
+          ? `<img class="maison-room-photo" src="${room.photo}" alt="${room.name}">`
+          : `<div class="maison-room-empty-photo">${room.emoji}<br><span>Pas encore de photo</span></div>`
+        }
+        <label class="maison-photo-btn">
+          📷 ${room.photo ? 'Changer la photo' : 'Ajouter une photo'}
+          <input type="file" accept="image/*" style="display:none" onchange="uploadMaisonPhoto(event,'${room.id}')">
+        </label>
+        ${room.photoDate ? `<div class="maison-photo-date">Dernière mise à jour : ${new Date(room.photoDate).toLocaleDateString('fr-FR')}</div>` : ''}
+      </div>
+      <div class="maison-notes-section">
+        <div class="maison-notes-label">📝 Contenu / inventaire</div>
+        <textarea class="maison-notes-input" id="maison-notes-${room.id}" placeholder="Ex:\n- Pyjamas été (x2)\n- Pull marine\n- Riz, pâtes, boîtes de thon\n..."
+        >${room.notes || ''}</textarea>
+        <button class="maison-save-notes-btn" onclick="saveMaisonNotes('${room.id}')">✓ Enregistrer</button>
+      </div>
+      ${room.photo ? `
+      <div class="maison-hint">
+        💡 <strong>Astuce :</strong> Fais une photo de ta pièce à chaque passage pour garder un inventaire visuel à jour.
+      </div>` : ''}
+    </div>
+  `;
+  // Auto-save on textarea blur
+  const ta = document.getElementById(`maison-notes-${room.id}`);
+  if (ta) ta.addEventListener('blur', () => saveMaisonNotes(room.id));
+}
+
+function openMaisonRoom(roomId) {
+  activeRoomId = roomId;
+  renderMaisonView();
+}
+
+async function uploadMaisonPhoto(event, roomId) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const room = maisonRooms.find(r => r.id === roomId);
+  if (!room) return;
+  toast('⏳ Upload en cours…');
+  try {
+    const url = await uploadToCloudinary(file);
+    room.photo = url;
+    room.photoDate = Date.now();
+    saveMaison();
+    renderMaisonView();
+    toast('✓ Photo mise à jour !', 'success');
+  } catch(e) {
+    toast('Erreur upload : ' + e.message, 'error');
+  }
+}
+
+function saveMaisonNotes(roomId) {
+  const room = maisonRooms.find(r => r.id === roomId);
+  if (!room) return;
+  const ta = document.getElementById(`maison-notes-${roomId}`);
+  if (ta) room.notes = ta.value;
+  saveMaison();
+  toast('✓ Notes enregistrées', 'success');
+}
+
+function deleteMaisonRoom(roomId) {
+  if (!confirm('Supprimer cette pièce ?')) return;
+  maisonRooms = maisonRooms.filter(r => r.id !== roomId);
+  activeRoomId = null;
+  saveMaison();
+  renderMaisonView();
+}
+
+function addMaisonRoom() {
+  const name = prompt('Nom de la pièce :');
+  if (!name || !name.trim()) return;
+  const emoji = prompt('Emoji (optionnel) :', '🏠') || '🏠';
+  const id = 'room-' + Date.now();
+  maisonRooms.push({ id, name: name.trim(), emoji: emoji.trim(), photo: '', notes: '' });
+  saveMaison();
+  renderMaisonView();
+}
+
 // ── INIT ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   load();
@@ -2712,4 +2890,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initTodoUI();
   renderCatSelect();
   render();
+  loadMaison();
 });

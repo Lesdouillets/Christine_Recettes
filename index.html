@@ -275,6 +275,18 @@
         </div>
 
         <div class="settings-section">
+          <div class="settings-section-title">Maison secondaire</div>
+          <button class="settings-row" onclick="switchView('maison')">
+            <span class="settings-row-icon">🏡</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Inventaire</span>
+              <span class="settings-row-desc">Photos et contenu de chaque pièce</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
           <div class="settings-section-title">Partage</div>
           <button class="settings-row" onclick="copyReadOnlyLink()">
             <span class="settings-row-icon">👁️</span>
@@ -307,6 +319,11 @@
     <!-- VUE TO-DO MULTI-LISTES -->
     <div id="view-todo" style="display:none">
       <div id="todo-container"></div>
+    </div>
+
+    <!-- VUE MAISON SECONDAIRE -->
+    <div id="view-maison" style="display:none">
+      <div id="maison-container"></div>
     </div>
 
   </main>
