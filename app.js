@@ -1187,7 +1187,7 @@ function render() {
 
 // ── GRID ──────────────────────────────────────────────
 function renderGrid() {
-  const list = filtered();
+  const list = filtered().sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
   const container = document.getElementById('grid');
 
   document.getElementById('page-title').textContent =
@@ -2015,13 +2015,16 @@ function updateFab() {
 // ── SWIPE ENTRE ONGLETS ───────────────────────────────
 function initSwipe() {
   const VIEWS = ['recipes', 'planner', 'todo', 'settings'];
-  let startX = 0, startY = 0;
+  let startX = 0, startY = 0, blocked = false;
   const main = document.getElementById('main');
   main.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
+    // Ne pas swiper si le doigt commence sur un élément scrollable horizontalement
+    blocked = !!e.target.closest('.quick-filter-strip, .planner-scroll, .import-tabs');
   }, { passive: true });
   main.addEventListener('touchend', e => {
+    if (blocked) return;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) {
