@@ -1617,3 +1617,30 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 }
 .todo-due.overdue { background: #FEF2F2; color: #B91C1C; }
 .todo-due.soon    { background: #FFF7ED; color: #C2410C; }
+
+/* ── HEADER-TOP-BAR : visible seulement desktop ──────── */
+.header-top-bar {
+  display: none; /* caché sur mobile, affiché sur desktop via media */
+}
+@media (min-width: 769px) {
+  .header-top-bar {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%;
+  }
+}
+
+/* Sur mobile : le header revient à la normale */
+@media (max-width: 768px) {
+  :root { --header-h: 60px; }
+  .header {
+    flex-direction: row; flex-wrap: nowrap;
+    height: var(--header-h);
+    background: var(--surface) !important;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px; gap: 12px;
+    overflow: visible;
+  }
+  .header-nav { display: none !important; }
+  .header-brand, .header-search, .header-actions { display: flex; }
+  .hamburger { display: flex !important; }
+}
