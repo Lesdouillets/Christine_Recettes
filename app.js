@@ -2981,7 +2981,7 @@ function renderMaisonRoomDetail(container) {
         </div>
         <label class="maison-photo-btn">
           📷 Ajouter une photo
-          <input type="file" accept="image/*" capture="environment" style="display:none" onchange="uploadMaisonPhoto(event,'${room.id}')">
+          <input type="file" accept="image/*" style="display:none" onchange="uploadMaisonPhoto(event,'${room.id}')">
         </label>
       </div>
 
