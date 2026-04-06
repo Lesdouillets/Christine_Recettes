@@ -1,0 +1,283 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 220" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- Gradient fond -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#FFF7ED"/>
+      <stop offset="40%"  stop-color="#FEF3C7"/>
+      <stop offset="100%" stop-color="#FDE8D8"/>
+    </linearGradient>
+    <!-- Gradient table -->
+    <linearGradient id="tableGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+    <!-- Gradient assiette -->
+    <radialGradient id="plateGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%"  stop-color="#fff"/>
+      <stop offset="100%" stop-color="#F5F0E8"/>
+    </radialGradient>
+    <!-- Vapeur gradient -->
+    <linearGradient id="steamGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%"  stop-color="#FDA4AF" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#FDA4AF" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Nappe -->
+    <linearGradient id="clothGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#FED7AA"/>
+      <stop offset="100%" stop-color="#FDBA74"/>
+    </linearGradient>
+    <!-- Fenêtre ciel -->
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#BAE6FD"/>
+      <stop offset="100%" stop-color="#E0F2FE"/>
+    </linearGradient>
+    <!-- Vignette côtés -->
+    <linearGradient id="vigL" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"  stop-color="#FFF7ED" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#FFF7ED" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="vigR" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"  stop-color="#FFF7ED" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FFF7ED" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fond principal -->
+  <rect width="1440" height="220" fill="url(#bgGrad)"/>
+
+  <!-- Mur arrière doux -->
+  <rect width="1440" height="130" fill="#FEF9EE" opacity="0.5"/>
+
+  <!-- === FENÊTRE GAUCHE === -->
+  <g transform="translate(80, 15)">
+    <!-- Cadre fenêtre -->
+    <rect x="0" y="0" width="110" height="100" rx="8" fill="url(#skyGrad)" stroke="#D97706" stroke-width="3"/>
+    <!-- Croisillon -->
+    <line x1="55" y1="0" x2="55" y2="100" stroke="#D97706" stroke-width="2.5"/>
+    <line x1="0" y1="50" x2="110" y2="50" stroke="#D97706" stroke-width="2.5"/>
+    <!-- Rebord fenêtre -->
+    <rect x="-8" y="97" width="126" height="10" rx="3" fill="#E4B87A"/>
+    <!-- Nuages -->
+    <g opacity="0.7">
+      <ellipse cx="25" cy="22" rx="14" ry="9" fill="white"/>
+      <ellipse cx="37" cy="18" rx="12" ry="8" fill="white"/>
+      <ellipse cx="14" cy="18" rx="10" ry="7" fill="white"/>
+    </g>
+    <g opacity="0.5">
+      <ellipse cx="80" cy="32" rx="12" ry="8" fill="white"/>
+      <ellipse cx="90" cy="28" rx="10" ry="7" fill="white"/>
+      <ellipse cx="72" cy="28" rx="9" ry="6" fill="white"/>
+    </g>
+    <!-- Soleil -->
+    <circle cx="90" cy="18" r="11" fill="#FDE047" opacity="0.9"/>
+    <g stroke="#FDE047" stroke-width="2" opacity="0.6">
+      <line x1="90" y1="3"  x2="90" y2="-2"/>
+      <line x1="100" y1="8"  x2="104" y2="5"/>
+      <line x1="104" y1="18" x2="109" y2="18"/>
+      <line x1="100" y1="28" x2="104" y2="31"/>
+    </g>
+    <!-- Colline verte -->
+    <ellipse cx="30" cy="102" rx="38" ry="18" fill="#86EFAC" opacity="0.6"/>
+    <ellipse cx="82" cy="104" rx="32" ry="14" fill="#6EE7B7" opacity="0.5"/>
+    <!-- Herbe bas -->
+    <rect x="0" y="88" width="110" height="15" fill="#86EFAC" opacity="0.4"/>
+  </g>
+
+  <!-- === PLANTE / HERBES AROMATIQUES gauche === -->
+  <g transform="translate(210, 60)">
+    <!-- Pot -->
+    <path d="M0,60 L8,60 Q9,75 7,80 L-7,80 Q-9,75 -8,60 Z" fill="#C2773A"/>
+    <ellipse cx="0" cy="60" rx="9" ry="4" fill="#D97706"/>
+    <!-- Terre -->
+    <ellipse cx="0" cy="61" rx="7" ry="3" fill="#92400E"/>
+    <!-- Tiges -->
+    <path d="M0,60 Q-8,40 -12,25" stroke="#16A34A" stroke-width="2" fill="none"/>
+    <path d="M0,60 Q0,38 2,20" stroke="#16A34A" stroke-width="2" fill="none"/>
+    <path d="M0,60 Q8,40 10,28" stroke="#16A34A" stroke-width="2" fill="none"/>
+    <!-- Feuilles basilic -->
+    <ellipse cx="-12" cy="25" rx="7" ry="4" fill="#22C55E" transform="rotate(-30,-12,25)"/>
+    <ellipse cx="2"   cy="20" rx="7" ry="4" fill="#16A34A" transform="rotate(-5,2,20)"/>
+    <ellipse cx="10"  cy="28" rx="7" ry="4" fill="#22C55E" transform="rotate(25,10,28)"/>
+    <!-- Feuilles secondaires -->
+    <ellipse cx="-7"  cy="35" rx="5" ry="3" fill="#4ADE80" transform="rotate(-20,-7,35)"/>
+    <ellipse cx="6"   cy="38" rx="5" ry="3" fill="#4ADE80" transform="rotate(15,6,38)"/>
+  </g>
+
+  <!-- === TABLE PRINCIPALE === -->
+  <!-- Nappe -->
+  <ellipse cx="720" cy="175" rx="520" ry="48" fill="url(#clothGrad)" opacity="0.9"/>
+  <!-- Dessus table bois -->
+  <path d="M240,148 Q720,130 1200,148 L1200,178 Q720,162 240,178 Z" fill="url(#tableGrad)" opacity="0.85"/>
+  <!-- Reflet table -->
+  <path d="M400,148 Q720,138 1040,148 Q1040,152 720,145 Q400,152 400,148 Z" fill="white" opacity="0.12"/>
+
+  <!-- === PLANCHE À DÉCOUPER === -->
+  <g transform="translate(360, 115)">
+    <rect x="0" y="0" width="95" height="52" rx="6" fill="#C8A96E"/>
+    <rect x="5" y="5" width="85" height="42" rx="4" fill="#D4B483"/>
+    <!-- Grain bois -->
+    <line x1="20" y1="5" x2="20" y2="47" stroke="#B8935A" stroke-width="1" opacity="0.4"/>
+    <line x1="40" y1="5" x2="40" y2="47" stroke="#B8935A" stroke-width="1" opacity="0.4"/>
+    <line x1="60" y1="5" x2="60" y2="47" stroke="#B8935A" stroke-width="1" opacity="0.4"/>
+    <line x1="80" y1="5" x2="80" y2="47" stroke="#B8935A" stroke-width="1" opacity="0.4"/>
+    <!-- Trou poignée -->
+    <ellipse cx="88" cy="26" rx="4" ry="8" fill="#C8A96E" stroke="#B8935A" stroke-width="1"/>
+    <!-- Tomate -->
+    <circle cx="28" cy="26" r="12" fill="#EF4444"/>
+    <circle cx="28" cy="26" r="10" fill="#F87171"/>
+    <path d="M28,14 Q30,10 32,12 Q30,8 28,11 Q26,8 24,12 Q26,10 28,14 Z" fill="#22C55E"/>
+    <!-- Tranches tomate -->
+    <line x1="20" y1="32" x2="36" y2="32" stroke="#DC2626" stroke-width="1.5" opacity="0.5"/>
+    <!-- Carotte -->
+    <path d="M58,40 Q65,38 70,30 Q72,34 70,38 Q65,42 58,40 Z" fill="#F97316"/>
+    <path d="M70,30 Q73,26 74,28 Q72,30 70,30 Z" fill="#16A34A"/>
+    <path d="M71,29 Q74,24 76,27 Q74,29 71,29 Z" fill="#16A34A"/>
+  </g>
+
+  <!-- === CASSEROLE (vapeur) === -->
+  <g transform="translate(570, 80)">
+    <!-- Vapeur -->
+    <g opacity="0.5">
+      <path d="M18,0 Q14,10 18,20 Q22,30 18,40" stroke="#FDA4AF" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M28,5 Q24,15 28,25 Q32,35 28,45" stroke="#FDA4AF" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M38,0 Q34,10 38,20 Q42,30 38,40" stroke="#FDA4AF" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </g>
+    <!-- Corps casserole -->
+    <path d="M0,50 Q0,85 56,85 Q112,85 112,50 L112,45 Q112,10 56,10 Q0,10 0,45 Z" fill="#F97316"/>
+    <ellipse cx="56" cy="45" rx="56" ry="14" fill="#FB923C"/>
+    <!-- Bord casserole -->
+    <ellipse cx="56" cy="45" rx="56" ry="14" fill="none" stroke="#EA580C" stroke-width="3"/>
+    <!-- Intérieur -->
+    <ellipse cx="56" cy="45" rx="48" ry="11" fill="#FED7AA"/>
+    <!-- Poignées -->
+    <path d="M0,55 Q-18,55 -18,65 Q-18,75 0,72" fill="none" stroke="#C2410C" stroke-width="5" stroke-linecap="round"/>
+    <path d="M112,55 Q130,55 130,65 Q130,75 112,72" fill="none" stroke="#C2410C" stroke-width="5" stroke-linecap="round"/>
+    <!-- Couvercle -->
+    <ellipse cx="56" cy="42" rx="54" ry="13" fill="#FB923C" stroke="#EA580C" stroke-width="2"/>
+    <ellipse cx="56" cy="38" rx="46" ry="10" fill="#FED7AA" opacity="0.4"/>
+    <!-- Bouton couvercle -->
+    <circle cx="56" cy="33" r="7" fill="#C2410C"/>
+    <circle cx="56" cy="33" r="4" fill="#EA580C"/>
+  </g>
+
+  <!-- === BAGUETTE DE PAIN === -->
+  <g transform="translate(740, 128) rotate(-8)">
+    <path d="M0,10 Q50,0 100,3 Q150,6 170,12 Q150,22 100,19 Q50,22 0,16 Z" fill="#D97706"/>
+    <path d="M5,12 Q50,4 100,7 Q150,10 165,14" stroke="#B45309" stroke-width="1.5" fill="none" opacity="0.5"/>
+    <!-- Grignes -->
+    <path d="M30,6 Q35,10 30,14" stroke="#92400E" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M65,5 Q70,9 65,13" stroke="#92400E" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M100,5 Q105,9 100,13" stroke="#92400E" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M135,7 Q140,11 135,15" stroke="#92400E" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Croûton bout gauche -->
+    <ellipse cx="3" cy="13" rx="6" ry="5" fill="#B45309"/>
+    <!-- Croûton bout droit -->
+    <ellipse cx="167" cy="13" rx="6" ry="5" fill="#B45309"/>
+  </g>
+
+  <!-- === SALADIER (fruits) === -->
+  <g transform="translate(970, 120)">
+    <!-- Bol -->
+    <path d="M0,20 Q0,65 75,65 Q150,65 150,20 L140,15 Q140,-5 75,-5 Q10,-5 10,15 Z" fill="#FCA5A5"/>
+    <ellipse cx="75" cy="15" rx="65" ry="16" fill="#FCA5A5"/>
+    <ellipse cx="75" cy="15" rx="58" ry="13" fill="#FECACA"/>
+    <!-- Pied bol -->
+    <rect x="60" y="65" width="30" height="8" rx="4" fill="#F87171"/>
+    <rect x="50" y="73" width="50" height="6" rx="3" fill="#EF4444"/>
+    <!-- Fraises -->
+    <g transform="translate(20, -5)">
+      <path d="M18,10 Q22,0 26,10 Q24,22 18,22 Q12,22 10,10 Q14,0 18,10 Z" fill="#EF4444"/>
+      <path d="M18,0 Q20,-4 22,-2 Q20,-6 18,-3 Q16,-6 14,-2 Q16,-4 18,0 Z" fill="#16A34A"/>
+      <g fill="#FCA5A5" opacity="0.8" font-size="3">
+        <circle cx="15" cy="12" r="1.2"/><circle cx="18" cy="8" r="1.2"/>
+        <circle cx="21" cy="12" r="1.2"/><circle cx="16" cy="16" r="1.2"/>
+        <circle cx="20" cy="16" r="1.2"/>
+      </g>
+    </g>
+    <!-- Raisin -->
+    <g transform="translate(55, -8)">
+      <circle cx="8"  cy="18" r="8" fill="#A855F7"/>
+      <circle cx="22" cy="18" r="8" fill="#9333EA"/>
+      <circle cx="15" cy="7"  r="8" fill="#A855F7"/>
+      <circle cx="29" cy="7"  r="8" fill="#7C3AED"/>
+      <circle cx="1"  cy="7"  r="8" fill="#9333EA"/>
+      <!-- Tige -->
+      <path d="M15,-5 Q20,-12 25,-8" stroke="#16A34A" stroke-width="2" fill="none"/>
+      <path d="M25,-8 Q28,-6 25,-4" stroke="#16A34A" stroke-width="2" fill="none"/>
+    </g>
+    <!-- Citron -->
+    <g transform="translate(100, -2)">
+      <ellipse cx="15" cy="14" rx="15" ry="12" fill="#FDE047"/>
+      <ellipse cx="15" cy="14" rx="12" ry="10" fill="#FEF08A"/>
+      <path d="M0,12 Q5,8 15,10 Q25,8 30,12" stroke="#FDE047" stroke-width="1" fill="none" opacity="0.5"/>
+    </g>
+  </g>
+
+  <!-- === LIVRE DE RECETTES === -->
+  <g transform="translate(1160, 105)">
+    <!-- Ombre -->
+    <rect x="5" y="5" width="90" height="110" rx="6" fill="#92400E" opacity="0.2"/>
+    <!-- Couverture -->
+    <rect x="0" y="0" width="90" height="110" rx="6" fill="#B45309"/>
+    <!-- Tranche -->
+    <rect x="0" y="0" width="10" height="110" rx="4" fill="#92400E"/>
+    <!-- Pages -->
+    <rect x="12" y="5" width="75" height="100" rx="2" fill="#FFFBEB"/>
+    <!-- Lignes texte -->
+    <g stroke="#D97706" stroke-width="1.5" opacity="0.4">
+      <line x1="18" y1="20" x2="82" y2="20"/>
+      <line x1="18" y1="30" x2="75" y2="30"/>
+      <line x1="18" y1="40" x2="80" y2="40"/>
+      <line x1="18" y1="50" x2="70" y2="50"/>
+    </g>
+    <!-- Illustration mini sur le livre -->
+    <circle cx="50" cy="75" r="18" fill="#FED7AA"/>
+    <text x="50" y="81" text-anchor="middle" font-size="20">🍳</text>
+    <!-- Titre livre -->
+    <rect x="18" y="10" width="64" height="5" rx="2" fill="#D97706" opacity="0.6"/>
+  </g>
+
+  <!-- === PLANTE DROITE === -->
+  <g transform="translate(1330, 50)">
+    <path d="M0,90 Q0,75 -4,70 Q-8,65 -3,60" stroke="#16A34A" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M0,90 Q2,72 8,65 Q14,58 10,52" stroke="#15803D" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M0,90 Q-2,78 -10,72 Q-18,66 -16,58" stroke="#22C55E" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- Grandes feuilles -->
+    <ellipse cx="-3" cy="60" rx="12" ry="5" fill="#22C55E" transform="rotate(-40,-3,60)"/>
+    <ellipse cx="10" cy="52" rx="13" ry="5" fill="#16A34A" transform="rotate(20,10,52)"/>
+    <ellipse cx="-16" cy="58" rx="11" ry="5" fill="#4ADE80" transform="rotate(-50,-16,58)"/>
+    <!-- Pot -->
+    <path d="M-12,90 Q-10,108 -4,112 L4,112 Q10,108 12,90 Z" fill="#EA580C"/>
+    <ellipse cx="0" cy="90" rx="12" ry="5" fill="#F97316"/>
+    <ellipse cx="0" cy="91" rx="10" ry="4" fill="#92400E"/>
+  </g>
+
+  <!-- === PETITS DÉTAILS DISPERSÉS === -->
+  <!-- Étoiles / particules chaudes -->
+  <g fill="#FCD34D" opacity="0.6">
+    <circle cx="280" cy="30" r="2.5"/>
+    <circle cx="340" cy="15" r="1.8"/>
+    <circle cx="500" cy="25" r="2"/>
+    <circle cx="800" cy="18" r="2.5"/>
+    <circle cx="950" cy="30" r="1.8"/>
+    <circle cx="1100" cy="20" r="2.2"/>
+    <circle cx="1250" cy="35" r="1.8"/>
+  </g>
+  <!-- Petits coeurs -->
+  <g opacity="0.35" fill="#F87171">
+    <path d="M318,22 Q320,18 322,22 Q326,16 322,26 Q320,28 318,26 Q314,16 318,22 Z"/>
+    <path d="M1050,15 Q1052,11 1054,15 Q1058,9 1054,19 Q1052,21 1050,19 Q1046,9 1050,15 Z"/>
+    <path d="M680,22 Q682,18 684,22 Q688,16 684,26 Q682,28 680,26 Q676,16 680,22 Z"/>
+  </g>
+
+  <!-- === VIGNETTES latérales pour fondu === -->
+  <rect width="140" height="220" fill="url(#vigL)"/>
+  <rect x="1300" width="140" height="220" fill="url(#vigR)"/>
+
+  <!-- === VIGNETTE BASSE (fond des onglets) === -->
+  <linearGradient id="bottomFade" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"  stop-color="#FFF7ED" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#FFF7ED" stop-opacity="0.6"/>
+  </linearGradient>
+  <rect y="130" width="1440" height="90" fill="url(#bottomFade)"/>
+</svg>
