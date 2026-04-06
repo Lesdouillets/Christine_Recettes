@@ -69,7 +69,7 @@ let _ownWrite = false; // évite re-render inutile sur notre propre écriture
 function _isUnlocked() {
   const pin = localStorage.getItem('edit-pin');
   if (!pin) return true; // aucun PIN défini = proprio sur son appareil
-  return sessionStorage.getItem('edit-unlocked') === '1';
+  return localStorage.getItem('edit-unlocked') === '1';
 }
 
 // Déverrouiller avec le PIN
