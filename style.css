@@ -68,6 +68,81 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0 20px;
 }
 
+/* ── DESKTOP : header illustré ── */
+@media (min-width: 769px) {
+  :root { --header-h: 170px; }
+
+  .header {
+    flex-direction: column; align-items: stretch; gap: 0;
+    height: var(--header-h);
+    background: url('home-bg.svg') center center / cover no-repeat;
+    border-bottom: none;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  /* Barre top : logo + search + actions */
+  .header-top-bar {
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 24px; height: 56px;
+    background: rgba(255,251,235,0.72);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(217,119,6,0.15);
+    flex-shrink: 0;
+  }
+
+  /* Barre des onglets en bas du header */
+  .header-nav {
+    display: flex; gap: 8px; align-items: center; justify-content: center;
+    padding: 0 24px; height: 114px;
+    flex-wrap: nowrap; flex-shrink: 0;
+  }
+
+  .nav-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 10px 18px; border-radius: 16px;
+    font-size: 13px; font-weight: 600;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(10px);
+    border: 1.5px solid rgba(255,255,255,0.9);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    color: var(--text-2); transition: all .18s;
+    min-width: 92px;
+  }
+  .nav-tab::before {
+    font-size: 26px; line-height: 1;
+  }
+  .nav-tab[data-view="home"]::before    { content: "🏠"; }
+  .nav-tab[data-view="recipes"]::before { content: "🍽️"; }
+  .nav-tab[data-view="planner"]::before { content: "📅"; }
+  .nav-tab[data-view="todo"]::before    { content: "✅"; }
+  .nav-tab[data-view="shop"]::before    { content: "🛒"; }
+  .nav-tab[data-view="maison"]::before  { content: "🏡"; }
+  .nav-tab[data-view="settings"]::before{ content: "⚙️"; }
+
+  .nav-tab:hover {
+    background: rgba(255,255,255,0.92);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    color: var(--text-1);
+  }
+  .nav-tab.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 4px 16px rgba(249,115,22,0.45);
+    transform: translateY(-2px);
+  }
+
+  /* Le hamburger reste caché sur desktop */
+  .hamburger { display: none !important; }
+
+  /* header-search reste dans la top bar */
+  .header-search { max-width: 340px; flex: 1; }
+  .header-actions { margin-left: auto; flex-shrink: 0; }
+  .header-brand { flex-shrink: 0; }
+}
+
 .hamburger {
   display: none; flex-direction: column; justify-content: center;
   gap: 4px; width: 36px; height: 36px; border: none;
