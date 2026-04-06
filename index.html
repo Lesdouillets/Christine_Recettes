@@ -48,10 +48,6 @@
   </div>
 
   <div class="header-actions">
-    <!-- MOBILE : À importer — tout à droite, bien visible -->
-    <button class="hbtn hbtn-primary hbtn-mobile-only" id="mobile-todo-btn" title="À importer" onclick="openImportTab('todo')">
-      📌 <span class="hbtn-label">À importer</span>
-    </button>
     <!-- DESKTOP : Import texte en premier plan -->
     <button class="hbtn hbtn-primary hbtn-desktop" id="text-import-btn" onclick="openImportTab('text')" title="Importer via texte">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="17" y2="6"/><line x1="3" y1="10" x2="13" y2="10"/><line x1="3" y1="14" x2="10" y2="14"/></svg>
@@ -658,7 +654,7 @@ Faire cuire dans une poêle beurrée 2 min de chaque côté."></textarea>
 
 
 <!-- ═══════════ FAB ═══════════ -->
-<button class="fab" id="fab-add" onclick="openAdd()" title="Nouvelle recette">+</button>
+<button class="fab" id="fab-add" onclick="openImportTab('todo')" title="URLs à importer">📌</button>
 
 <!-- ═══════════ PULL-TO-REFRESH ═══════════ -->
 <div class="ptr-indicator" id="ptr-indicator">

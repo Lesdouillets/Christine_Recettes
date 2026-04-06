@@ -902,7 +902,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-l); }
 
   .header-nav { display: none; }
-  .sidebar-mobile-nav { display: block; }
+  .sidebar-mobile-nav { display: none; } /* remplacé par la bottom nav */
   .hamburger { display: flex; }
 
   /* Barre de recherche plus grande sur mobile */
@@ -1262,7 +1262,7 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   width: 52px; height: 52px;
   border-radius: 50%;
   background: var(--primary); color: #fff;
-  font-size: 28px; line-height: 1;
+  font-size: 22px; line-height: 1;
   border: none; cursor: pointer;
   box-shadow: 0 4px 16px rgba(59,130,246,.45);
   z-index: 190;

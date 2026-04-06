@@ -2022,7 +2022,6 @@ function initSwipe() {
   main.addEventListener('touchstart', e => {
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    // Ne pas swiper si le doigt commence sur un élément scrollable horizontalement
     blocked = !!e.target.closest('.quick-filter-strip, .planner-scroll, .import-tabs');
   }, { passive: true });
   main.addEventListener('touchend', e => {
@@ -2030,6 +2029,14 @@ function initSwipe() {
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      // Vue maison : swipe gauche (dx < 0) = retour arrière
+      if (currentView === 'maison') {
+        if (dx < 0) {
+          if (activeRoomId) { activeRoomId = null; renderMaisonView(); }
+          else switchView('settings');
+        }
+        return;
+      }
       const idx = VIEWS.indexOf(currentView);
       if (dx < 0 && idx < VIEWS.length - 1) switchView(VIEWS[idx + 1]);
       else if (dx > 0 && idx > 0) switchView(VIEWS[idx - 1]);
@@ -2708,12 +2715,11 @@ function loadDemo() {
 const MAISON_STORE = db.collection('data').doc('maison');
 
 const DEFAULT_ROOMS = [
-  { id: 'cuisine',      name: 'Cuisine',       emoji: '🍳' },
-  { id: 'chambre',      name: 'Chambre',       emoji: '🛏️' },
-  { id: 'garde-manger', name: 'Garde-manger',  emoji: '🥫' },
-  { id: 'garde-robe',   name: 'Garde-robe',    emoji: '👗' },
-  { id: 'salle-bain',   name: 'Salle de bain', emoji: '🚿' },
-  { id: 'salon',        name: 'Salon',         emoji: '🛋️' },
+  { id: 'cuisine',         name: 'Cuisine',            emoji: '🍳' },
+  { id: 'chambre-parents', name: 'Chambre parents',    emoji: '🛏️' },
+  { id: 'chambre-enfant',  name: 'Chambre enfant',     emoji: '🧒' },
+  { id: 'sdb-parents',     name: 'Salle de bain parents', emoji: '🚿' },
+  { id: 'sdb-enfant',      name: 'Salle de bain enfant',  emoji: '🛁' },
 ];
 
 let maisonRooms     = null;  // [{ id, name, emoji, photo, notes }]
