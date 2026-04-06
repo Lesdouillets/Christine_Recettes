@@ -2026,7 +2026,8 @@ function initSearch() {
 // ── NAVIGATION ────────────────────────────────────────
 const ALL_VIEWS = ['recipes', 'planner', 'shop', 'todo', 'settings', 'maison'];
 
-function switchView(view) {
+function switchView(view, pushHistory = true) {
+  if (pushHistory) history.pushState({ view, roomId: null, todoId: null }, '', '');
   currentView = view;
   ALL_VIEWS.forEach(v => {
     const el = document.getElementById('view-' + v);
@@ -2099,27 +2100,20 @@ function initSwipe() {
   const TAB_VIEWS = ['recipes', 'planner', 'todo', 'shop', 'settings'];
   let startX = 0, startY = 0, blocked = false;
 
-  document.addEventListener('touchstart', e => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    blocked = !!e.target.closest('.quick-filter-strip, .planner-scroll, .import-tabs, select')
-           || (e.target.tagName === 'TEXTAREA')
-           || (e.target.tagName === 'INPUT' && e.target.type !== 'checkbox');
-  }, { passive: true });
+  function isBlockedTarget(el) {
+    return !!el.closest('.quick-filter-strip, .planner-scroll, .import-tabs, select, .recipe-grid, .recipe-card, .sidebar')
+        || el.tagName === 'TEXTAREA'
+        || (el.tagName === 'INPUT' && el.type !== 'checkbox')
+        || el.tagName === 'BUTTON'
+        || el.tagName === 'A';
+  }
 
-  document.addEventListener('touchend', e => {
-    if (blocked) return;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+  function handleSwipe(dx, dy, minDist) {
+    if (Math.abs(dx) < minDist || Math.abs(dx) < Math.abs(dy) * 1.5) return;
 
     if (dx < 0) {
-      // ← swipe gauche = retour arrière (si sous-vue) ou onglet suivant
-      // Priorité 1 : modal/overlay ouverte → fermer
       const openModal = document.querySelector('.overlay.open');
       if (openModal) { openModal.classList.remove('open'); return; }
-
-      // Priorité 2 : sous-vue active
       if (currentView === 'maison') {
         if (activeRoomId) { activeRoomId = null; renderMaisonView(); }
         else switchView('settings');
@@ -2128,19 +2122,64 @@ function initSwipe() {
       if (currentView === 'todo' && activeTodoListId) {
         activeTodoListId = null; renderTodoView(); return;
       }
-
-      // Priorité 3 : onglet suivant dans la liste
       const idx = TAB_VIEWS.indexOf(currentView);
       if (idx >= 0 && idx < TAB_VIEWS.length - 1) switchView(TAB_VIEWS[idx + 1]);
-
     } else {
-      // → swipe droit = onglet précédent (pas dans sous-vue ni modal)
       const openModal = document.querySelector('.overlay.open');
       if (openModal) return;
       if (currentView === 'maison' || (currentView === 'todo' && activeTodoListId)) return;
       const idx = TAB_VIEWS.indexOf(currentView);
       if (idx > 0) switchView(TAB_VIEWS[idx - 1]);
     }
+  }
+
+  // ── Touch (mobile) ────────────────────────────────────
+  document.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    blocked = isBlockedTarget(e.target);
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (blocked) return;
+    handleSwipe(
+      e.changedTouches[0].clientX - startX,
+      e.changedTouches[0].clientY - startY,
+      55
+    );
+  }, { passive: true });
+
+  // ── Mouse drag (desktop) ─────────────────────────────
+  let mouseDown = false;
+  document.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    startX = e.clientX; startY = e.clientY;
+    mouseDown = true;
+    blocked = isBlockedTarget(e.target);
+  });
+  document.addEventListener('mouseup', e => {
+    if (!mouseDown) return;
+    mouseDown = false;
+    if (blocked) return;
+    handleSwipe(e.clientX - startX, e.clientY - startY, 120);
+  });
+  document.addEventListener('mouseleave', () => { mouseDown = false; });
+
+  // ── Trackpad Mac (wheel horizontal) ──────────────────
+  let wheelTimer = null;
+  let wheelAccX = 0, wheelAccY = 0;
+  document.addEventListener('wheel', e => {
+    if (isBlockedTarget(e.target)) return;
+    wheelAccX += e.deltaX;
+    wheelAccY += e.deltaY;
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => {
+      // Geste principalement horizontal et assez ample
+      if (Math.abs(wheelAccX) > 80 && Math.abs(wheelAccX) > Math.abs(wheelAccY) * 1.5) {
+        handleSwipe(-wheelAccX, -wheelAccY, 0); // deltaX positif = doigt vers gauche = vue suivante
+      }
+      wheelAccX = 0; wheelAccY = 0;
+    }, 80);
   }, { passive: true });
 }
 
@@ -2710,7 +2749,7 @@ function renderTaskHtml(listId, item) {
 }
 
 // ── Actions ───────────────────────────────────────────
-function openTodoList(id) { activeTodoListId = id; renderTodoView(); }
+function openTodoList(id) { history.pushState({ view: 'todo', roomId: null, todoId: id }, '', ''); activeTodoListId = id; renderTodoView(); }
 function closeTodoList()  { activeTodoListId = null; renderTodoView(); }
 
 function setTodoFilter(f)   { todoListFilter = f;   renderTodoView(); }
@@ -3106,6 +3145,7 @@ function rotateMaisonPhoto(roomId, index, deg) {
 }
 
 function openMaisonRoom(roomId) {
+  history.pushState({ view: 'maison', roomId, todoId: null }, '', '');
   activeRoomId = roomId;
   renderMaisonView();
 }
@@ -3164,8 +3204,18 @@ function addMaisonRoom() {
   renderMaisonView();
 }
 
+// ── HISTORIQUE NAVIGATEUR ─────────────────────────────
+window.addEventListener('popstate', e => {
+  const state = e.state;
+  if (!state) { switchView('recipes', false); return; }
+  activeRoomId     = state.roomId || null;
+  activeTodoListId = state.todoId  || null;
+  switchView(state.view, false);
+});
+
 // ── INIT ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  history.replaceState({ view: 'recipes', roomId: null, todoId: null }, '', '');
   load();
   loadDemo();
   initSearch();

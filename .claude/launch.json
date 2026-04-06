@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "mes-recettes",
-      "runtimeExecutable": "/tmp/serve-recettes.sh",
-      "runtimeArgs": [],
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": ["/tmp/serve-recettes.sh"],
       "port": 3000
     }
   ]
