@@ -1971,7 +1971,7 @@ function initSearch() {
 }
 
 // ── NAVIGATION ────────────────────────────────────────
-const ALL_VIEWS = ['home', 'recipes', 'planner', 'shop', 'todo', 'settings', 'maison'];
+const ALL_VIEWS = ['recipes', 'planner', 'shop', 'todo', 'settings', 'maison'];
 
 function switchView(view) {
   currentView = view;
@@ -1987,8 +1987,7 @@ function switchView(view) {
   if (searchEl) searchEl.style.display = view === 'recipes' ? '' : 'none';
 
   updateFab();
-  if (view === 'home')         renderHomeView();
-  else if (view === 'planner') renderPlanner();
+  if (view === 'planner') renderPlanner();
   else if (view === 'shop')    renderShopView();
   else if (view === 'todo')    renderTodoView();
   else if (view === 'settings') initSettingsView();
@@ -3084,10 +3083,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initTodoUI();
   renderCatSelect();
   loadMaison();
-  // Sur desktop, démarrer sur la Home ; sur mobile, démarrer sur les recettes
-  if (window.innerWidth > 768 && !LECTURE_MODE) {
-    switchView('home');
-  } else {
-    render();
-  }
+  render();
 });
