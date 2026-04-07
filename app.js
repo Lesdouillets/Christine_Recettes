@@ -1543,17 +1543,18 @@ function gatherIngredients() {
 // ── DÉTECTION DOUBLONS ────────────────────────────────
 function findDuplicate(name, sourceUrl, excludeId) {
   const norm = name.trim().toLowerCase().replace(/\s+/g, ' ');
-  // Par nom exact (insensible à la casse)
-  const byName = recipes.find(r => r.id !== excludeId &&
-    r.name.trim().toLowerCase().replace(/\s+/g, ' ') === norm);
-  if (byName) return { recipe: byName, reason: 'name' };
-  // Par URL source
-  if (sourceUrl) {
-    const byUrl = recipes.find(r => r.id !== excludeId &&
-      r.source?.ref && r.source.ref.trim() === sourceUrl.trim());
-    if (byUrl) return { recipe: byUrl, reason: 'url' };
-  }
-  return null;
+  const url  = sourceUrl?.trim() || '';
+  // Doublon = même nom ET même lien (les deux doivent correspondre)
+  // Si l'un des deux n'a pas de lien, on compare par nom uniquement
+  const dup = recipes.find(r => {
+    if (r.id === excludeId) return false;
+    const rName = r.name.trim().toLowerCase().replace(/\s+/g, ' ');
+    const rUrl  = r.source?.ref?.trim() || '';
+    if (rName !== norm) return false;            // noms différents → pas doublon
+    if (!url || !rUrl) return true;              // pas de lien à comparer → nom seul suffit
+    return url === rUrl;                         // même nom ET même lien
+  });
+  return dup ? { recipe: dup, reason: url && dup.source?.ref ? 'name+url' : 'name' } : null;
 }
 
 function saveRecipe() {
@@ -1881,9 +1882,10 @@ function doImport() {
   let data;
   try { data = JSON.parse(raw); } catch (e) { errEl.textContent = 'Fichier JSON invalide : ' + e.message; return; }
   const list = Array.isArray(data) ? data : [data];
-  let added = 0;
+  let added = 0, skipped = 0;
   list.forEach(item => {
     if (!item.name || !item.category) return;
+    const sourceUrl = item.source?.ref || item.url || '';
     const r = {
       id:           item.id || uid(),
       name:         item.name,
@@ -1896,7 +1898,7 @@ function doImport() {
       photo:        item.photo     || item.image      || '',
       source: {
         type: item.source?.type || (item.url ? 'url' : 'autre'),
-        ref:  item.source?.ref  || item.url || '',
+        ref:  sourceUrl,
       },
       ingredients:  normalizeIngs(item.ingredients || []),
       instructions: item.instructions || item.preparation || '',
@@ -1904,11 +1906,14 @@ function doImport() {
       dateAdded:    item.dateAdded || new Date().toISOString(),
     };
     if (recipes.find(x => x.id === r.id)) r.id = uid();
+    if (findDuplicate(r.name, sourceUrl, r.id)) { skipped++; return; }
     recipes.unshift(r);
     added++;
   });
-  if (!added) { errEl.textContent = 'Aucune recette valide (name + category requis).'; return; }
-  save(); closeModal('ov-import'); toast(`${added} recette${added > 1 ? 's' : ''} importée${added > 1 ? 's' : ''} ✓`); render();
+  if (!added && !skipped) { errEl.textContent = 'Aucune recette valide (name + category requis).'; return; }
+  const msg = `${added} recette${added > 1 ? 's' : ''} importée${added > 1 ? 's' : ''}` +
+    (skipped ? ` · ${skipped} doublon${skipped > 1 ? 's' : ''} ignoré${skipped > 1 ? 's' : ''}` : '');
+  save(); closeModal('ov-import'); toast(msg + ' ✓'); render();
 }
 function normalizeIngs(ings) {
   return ings.map(i => {
