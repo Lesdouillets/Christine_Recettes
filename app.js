@@ -204,8 +204,12 @@ function mergePhotos(arr) {
 
 // ── SYNC PHOTOS FIRESTORE ─────────────────────────────
 // Sauvegarde une photo dans Firestore (collection photos/{recipeId})
+// Accepte base64 ET URLs Cloudinary (https://res.cloudinary.com/...)
 function savePhotoToCloud(recipeId, photoData) {
-  if (!recipeId || !photoData || !photoData.startsWith('data:')) return;
+  if (!recipeId || !photoData) return;
+  const isBase64 = photoData.startsWith('data:');
+  const isCloudinary = photoData.includes('res.cloudinary.com');
+  if (!isBase64 && !isCloudinary) return;
   PHOTOS.doc(String(recipeId)).set({ photo: photoData, updatedAt: Date.now() })
     .catch(e => console.warn('Photo cloud save:', e));
 }
@@ -825,6 +829,7 @@ async function doUrlImport() {
       const dup = findDuplicate(recipe.name || '', urls[i], recipe.id);
       if (dup) { skipped++; continue; }
       recipes.push(recipe);
+      if (recipe.photo) savePhotoToCloud(recipe.id, recipe.photo);
       save();
       ok++;
     } catch(e) {
@@ -1612,6 +1617,9 @@ function saveRecipe() {
 
   if (idx >= 0) { recipes[idx] = recipe; toast('Recette mise à jour ✓'); }
   else          { recipes.unshift(recipe); toast('Recette ajoutée ✓'); }
+
+  // Sauvegarder la photo dans Firestore séparément (base64 ou Cloudinary URL)
+  if (photo) savePhotoToCloud(id, photo);
 
   save(); closeModal('ov-edit'); render();
 }
