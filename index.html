@@ -637,6 +637,38 @@ Faire cuire dans une poêle beurrée 2 min de chaque côté."></textarea>
 </div>
 
 
+<!-- ═══════════ MODAL : AJOUTER AU PLANNING ═══════════ -->
+<div class="overlay" id="ov-plan-adder">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Ajouter au planning</h2>
+      <button class="close-btn" onclick="closeModal('ov-plan-adder')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="plan-adder-title" style="font-weight:700;font-size:15px;margin-bottom:16px;color:var(--text-1)"></div>
+
+      <div class="plan-adder-label">Jour</div>
+      <div id="plan-adder-days" class="plan-adder-days"></div>
+
+      <div class="plan-adder-label" style="margin-top:16px">Repas</div>
+      <div class="plan-adder-toggle">
+        <button class="plan-adder-opt active" data-adder-meal="midi" onclick="document.querySelectorAll('[data-adder-meal]').forEach(b=>b.classList.toggle('active',b===this));planAdderMeal='midi'">Déjeuner</button>
+        <button class="plan-adder-opt" data-adder-meal="soir" onclick="document.querySelectorAll('[data-adder-meal]').forEach(b=>b.classList.toggle('active',b===this));planAdderMeal='soir'">Dîner</button>
+      </div>
+
+      <div class="plan-adder-label" style="margin-top:16px">Plat</div>
+      <div class="plan-adder-toggle">
+        <button class="plan-adder-opt" data-adder-course="entree" onclick="document.querySelectorAll('[data-adder-course]').forEach(b=>b.classList.toggle('active',b===this));planAdderCourse='entree'">Entrée</button>
+        <button class="plan-adder-opt active" data-adder-course="plat" onclick="document.querySelectorAll('[data-adder-course]').forEach(b=>b.classList.toggle('active',b===this));planAdderCourse='plat'">Plat</button>
+        <button class="plan-adder-opt" data-adder-course="dessert" onclick="document.querySelectorAll('[data-adder-course]').forEach(b=>b.classList.toggle('active',b===this));planAdderCourse='dessert'">Dessert</button>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%;margin-top:20px" onclick="confirmPlanAdder()">Ajouter au planning</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- ═══════════ MODAL : GÉRER LES CATÉGORIES ═══════════ -->
 <div class="overlay" id="ov-categories">
   <div class="modal">

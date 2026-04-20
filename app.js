@@ -46,6 +46,8 @@ const AISLE_KW = {
 
 const DAYS_FR   = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const MONTHS_FR = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+const MEALS     = [{ id:'midi', label:'Déjeuner' }, { id:'soir', label:'Dîner' }];
+const COURSES   = [{ id:'entree', label:'Entrée' }, { id:'plat', label:'Plat' }, { id:'dessert', label:'Dessert' }];
 
 // ── FIREBASE ──────────────────────────────────────────
 firebase.initializeApp({
@@ -155,6 +157,10 @@ let currentView    = 'recipes';
 let weekStart      = getMonday(new Date());
 let currentDetailId = null;
 let pickerSlot     = null;
+let planAdderRecipeId = null;
+let planAdderDate  = null;
+let planAdderMeal  = 'midi';
+let planAdderCourse = 'plat';
 
 // ── PHOTOS LOCALES (stockage séparé, jamais écrasé par Firebase) ──────────
 // { [recipeId]: "data:image/..." }
@@ -250,6 +256,8 @@ function load() {
   try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
   try { urlTodo    = JSON.parse(localStorage.getItem('mes-urls-todo')         || '[]'); } catch { urlTodo = []; }
   loadShopItems();
+  loadCartSet();
+  migrateMealPlan();
   loadTodoLists();
   initTodoSync();
   initUrlTodoSync();
@@ -1301,6 +1309,7 @@ function makeCard(r) {
       <img src="${esc(photoSrc)}" alt="${esc(r.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">
       <div class="card-photo-cat">${catPillHtml(r.category)}</div>
       <button class="card-del-btn" onclick="event.stopPropagation();deleteRecipeById('${r.id}')" title="Supprimer">✕</button>
+      <button class="card-plan-btn" onclick="event.stopPropagation();openPlanAdder('${r.id}')" title="Ajouter au planning">📅</button>
       <button class="card-cart-btn" onclick="event.stopPropagation();toggleCartById('${r.id}')"
         title="${inCart ? 'Retirer de la liste' : 'Ajouter à la liste'}">${inCart ? '🛒' : '＋'}</button>
     </div>
@@ -1352,9 +1361,15 @@ function deleteRecipeById(id) {
   if (!confirm(`Supprimer « ${r.name} » définitivement ?`)) return;
   recipes = recipes.filter(x => String(x.id) !== String(id));
   cartSet.delete(id);
+  saveCartSet();
   Object.keys(mealPlan).forEach(date => {
-    if (mealPlan[date].midi === id) mealPlan[date].midi = null;
-    if (mealPlan[date].soir === id) mealPlan[date].soir = null;
+    MEALS.forEach(({ id: meal }) => {
+      COURSES.forEach(({ id: course }) => {
+        if (mealPlan[date]?.[meal]?.[course] === id) mealPlan[date][meal][course] = null;
+      });
+    });
+    const dayEmpty = MEALS.every(({ id: m }) => COURSES.every(({ id: c }) => !mealPlan[date]?.[m]?.[c]));
+    if (dayEmpty) delete mealPlan[date];
   });
   // Supprimer la photo du store local et de Firestore
   const photoMap = loadPhotoStore();
@@ -1371,6 +1386,7 @@ function renderCartBadge() {
 }
 function toggleCartById(id) {
   cartSet.has(id) ? cartSet.delete(id) : cartSet.add(id);
+  saveCartSet();
   render();
 }
 function toggleCart() {
@@ -1631,9 +1647,15 @@ function deleteCurrentRecipe() {
   if (!r || !confirm(`Supprimer « ${r.name} » définitivement ?`)) return;
   recipes = recipes.filter(x => String(x.id) !== String(id));
   cartSet.delete(id);
+  saveCartSet();
   Object.keys(mealPlan).forEach(date => {
-    if (mealPlan[date].midi === id) mealPlan[date].midi = null;
-    if (mealPlan[date].soir === id) mealPlan[date].soir = null;
+    MEALS.forEach(({ id: meal }) => {
+      COURSES.forEach(({ id: course }) => {
+        if (mealPlan[date]?.[meal]?.[course] === id) mealPlan[date][meal][course] = null;
+      });
+    });
+    const dayEmpty = MEALS.every(({ id: m }) => COURSES.every(({ id: c }) => !mealPlan[date]?.[m]?.[c]));
+    if (dayEmpty) delete mealPlan[date];
   });
   save(); closeModal('ov-edit'); toast('Recette supprimée', 'info'); render();
 }
@@ -1724,6 +1746,22 @@ function initPhotoInputs() {
   });
 }
 
+// ── MEAL PLAN MIGRATION ───────────────────────────────
+function migrateMealPlan() {
+  let changed = false;
+  Object.keys(mealPlan).forEach(date => {
+    MEALS.forEach(({ id: meal }) => {
+      const val = mealPlan[date]?.[meal];
+      if (typeof val === 'string' || val === null) {
+        if (!mealPlan[date]) mealPlan[date] = {};
+        mealPlan[date][meal] = { entree: null, plat: val || null, dessert: null };
+        changed = true;
+      }
+    });
+  });
+  if (changed) save();
+}
+
 // ── SHOPPING LIST ─────────────────────────────────────
 function openShopping() {
   showShopStep(1);
@@ -1747,6 +1785,7 @@ function generateShoppingList() {
   const selected = [...document.querySelectorAll('#shop-picker input:checked')].map(cb => cb.id.replace('shk-',''));
   if (!selected.length) { toast('Sélectionnez au moins une recette.', 'error'); return; }
   cartSet = new Set(selected);
+  saveCartSet();
   renderCartBadge();
 
   const merged = new Map();
@@ -1955,48 +1994,59 @@ function renderPlanner() {
     grid.appendChild(cell);
   });
 
-  ['midi','soir'].forEach(meal => {
-    const label = document.createElement('div');
-    label.className = 'planner-row-label';
-    label.textContent = meal === 'midi' ? 'Déjeuner' : 'Dîner';
-    grid.appendChild(label);
+  MEALS.forEach(({ id: meal, label: mealLabel }) => {
+    const sep = document.createElement('div');
+    sep.className = 'planner-meal-sep';
+    sep.textContent = mealLabel;
+    grid.appendChild(sep);
 
-    days.forEach(d => {
-      const key      = dateKey(d);
-      const recipeId = mealPlan[key]?.[meal];
-      const recipe   = recipeId ? recipes.find(r => r.id === recipeId) : null;
-      const cell     = document.createElement('div');
-      cell.className = 'planner-cell' + (recipe ? ' filled' : '');
+    COURSES.forEach(({ id: course, label: courseLabel }) => {
+      const rowLabel = document.createElement('div');
+      rowLabel.className = 'planner-row-label';
+      rowLabel.textContent = courseLabel;
+      grid.appendChild(rowLabel);
 
-      if (recipe) {
-        cell.innerHTML = `
-          <div class="planner-recipe-card">
-            <button class="planner-remove" onclick="removePlanSlot('${key}','${meal}')">✕</button>
-            ${catPillHtml(recipe.category)}
-            <div class="planner-recipe-name">${esc(recipe.name)}</div>
-          </div>`;
-      } else {
-        const btn = document.createElement('div');
-        btn.className = 'add-slot';
-        btn.innerHTML = '<span class="add-slot-icon">+</span><span>Ajouter</span>';
-        btn.addEventListener('click', () => openPicker(key, meal));
-        cell.appendChild(btn);
-      }
-      grid.appendChild(cell);
+      days.forEach(d => {
+        const key      = dateKey(d);
+        const slot     = mealPlan[key]?.[meal];
+        const recipeId = slot?.[course] ?? null;
+        const recipe   = recipeId ? recipes.find(r => r.id === recipeId) : null;
+        const cell     = document.createElement('div');
+        cell.className = 'planner-cell' + (recipe ? ' filled' : '');
+
+        if (recipe) {
+          cell.innerHTML = `
+            <div class="planner-recipe-card">
+              <button class="planner-remove" onclick="removePlanSlot('${key}','${meal}','${course}')">✕</button>
+              ${catPillHtml(recipe.category)}
+              <div class="planner-recipe-name">${esc(recipe.name)}</div>
+            </div>`;
+        } else {
+          const btn = document.createElement('div');
+          btn.className = 'add-slot';
+          btn.innerHTML = '<span class="add-slot-icon">+</span>';
+          btn.addEventListener('click', () => openPicker(key, meal, course));
+          cell.appendChild(btn);
+        }
+        grid.appendChild(cell);
+      });
     });
   });
 }
 
-function removePlanSlot(date, meal) {
-  if (mealPlan[date]) {
-    mealPlan[date][meal] = null;
-    if (!mealPlan[date].midi && !mealPlan[date].soir) delete mealPlan[date];
+function removePlanSlot(date, meal, course) {
+  if (mealPlan[date]?.[meal]) {
+    mealPlan[date][meal][course] = null;
+    const dayEmpty = MEALS.every(({ id: m }) =>
+      COURSES.every(({ id: c }) => !mealPlan[date]?.[m]?.[c])
+    );
+    if (dayEmpty) delete mealPlan[date];
   }
   save(); renderPlanner();
 }
 
-function openPicker(date, meal) {
-  pickerSlot = { date, meal };
+function openPicker(date, meal, course) {
+  pickerSlot = { date, meal, course };
   document.getElementById('picker-search').value = '';
   renderPickerList('');
   openModal('ov-picker');
@@ -2012,12 +2062,57 @@ function renderPickerList(query) {
     item.innerHTML = `${catPillHtml(r.category)} <span class="pi-name">${esc(r.name)}</span>`;
     item.addEventListener('click', () => {
       if (!mealPlan[pickerSlot.date]) mealPlan[pickerSlot.date] = {};
-      mealPlan[pickerSlot.date][pickerSlot.meal] = r.id;
+      if (!mealPlan[pickerSlot.date][pickerSlot.meal]) mealPlan[pickerSlot.date][pickerSlot.meal] = { entree: null, plat: null, dessert: null };
+      mealPlan[pickerSlot.date][pickerSlot.meal][pickerSlot.course] = r.id;
       save(); closeModal('ov-picker'); renderPlanner();
     });
     el.appendChild(item);
   });
   if (!list.length) el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-3)">Aucune recette trouvée</div>`;
+}
+
+// ── PLAN ADDER (depuis carte recette) ─────────────────
+function openPlanAdder(recipeId) {
+  planAdderRecipeId = recipeId;
+  planAdderDate     = dateKey(new Date());
+  planAdderMeal     = 'midi';
+  planAdderCourse   = 'plat';
+  const r = recipes.find(x => x.id === recipeId);
+  document.getElementById('plan-adder-title').textContent = r ? r.name : '';
+
+  const today = new Date();
+  const container = document.getElementById('plan-adder-days');
+  container.innerHTML = '';
+  for (let i = 0; i < 14; i++) {
+    const d = addDays(today, i);
+    const key = dateKey(d);
+    const btn = document.createElement('button');
+    btn.className = 'plan-adder-day-btn' + (key === planAdderDate ? ' active' : '');
+    btn.dataset.date = key;
+    btn.innerHTML = `<span class="pad-day">${DAYS_FR[d.getDay() === 0 ? 6 : d.getDay()-1].slice(0,3)}</span><span class="pad-num">${d.getDate()}</span>`;
+    btn.addEventListener('click', () => {
+      planAdderDate = key;
+      container.querySelectorAll('.plan-adder-day-btn').forEach(b => b.classList.toggle('active', b.dataset.date === key));
+    });
+    container.appendChild(btn);
+  }
+
+  document.querySelectorAll('[data-adder-meal]').forEach(b => b.classList.toggle('active', b.dataset.adderMeal === planAdderMeal));
+  document.querySelectorAll('[data-adder-course]').forEach(b => b.classList.toggle('active', b.dataset.adderCourse === planAdderCourse));
+  openModal('ov-plan-adder');
+}
+
+function confirmPlanAdder() {
+  if (!planAdderRecipeId || !planAdderDate) return;
+  if (!mealPlan[planAdderDate]) mealPlan[planAdderDate] = {};
+  if (!mealPlan[planAdderDate][planAdderMeal]) mealPlan[planAdderDate][planAdderMeal] = { entree: null, plat: null, dessert: null };
+  mealPlan[planAdderDate][planAdderMeal][planAdderCourse] = planAdderRecipeId;
+  save();
+  closeModal('ov-plan-adder');
+  const courseLabel = COURSES.find(c => c.id === planAdderCourse)?.label || '';
+  const mealLabel   = MEALS.find(m => m.id === planAdderMeal)?.label || '';
+  toast(`✓ Ajouté au planning (${mealLabel} · ${courseLabel})`);
+  if (currentView === 'planner') renderPlanner();
 }
 
 // ── SEARCH ────────────────────────────────────────────
@@ -2441,6 +2536,12 @@ function loadShopItems() {
 }
 function saveShopItems() {
   try { localStorage.setItem('mes-courses', JSON.stringify(shopItems)); } catch(e) {}
+}
+function loadCartSet() {
+  try { cartSet = new Set(JSON.parse(localStorage.getItem('mes-courses-cart') || '[]')); } catch { cartSet = new Set(); }
+}
+function saveCartSet() {
+  try { localStorage.setItem('mes-courses-cart', JSON.stringify([...cartSet])); } catch(e) {}
 }
 function initShopAisleSelect() {
   const sel = document.getElementById('shop-add-aisle');

@@ -448,7 +448,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .planner-cell {
   background: var(--surface); border-radius: var(--radius);
-  border: 1.5px dashed var(--border); min-height: 76px;
+  border: 1.5px dashed var(--border); min-height: 52px;
   display: flex; align-items: center; justify-content: center;
   transition: all var(--transition); position: relative;
 }
@@ -474,6 +474,55 @@ button { font-family: inherit; cursor: pointer; }
   cursor: pointer; opacity: 0; transition: opacity var(--transition);
 }
 .planner-cell.filled:hover .planner-remove { opacity: 1; }
+
+.planner-meal-sep {
+  grid-column: 1 / -1;
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--primary); background: var(--primary-bg);
+  padding: 5px 10px; border-radius: var(--radius);
+  margin-top: 4px;
+}
+
+/* ── CARD PLAN BUTTON ──────────────────────────────── */
+.card-plan-btn {
+  position: absolute; top: 8px; left: 8px;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255,255,255,.85); border: none;
+  font-size: 14px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity var(--transition);
+  backdrop-filter: blur(4px);
+}
+.card:hover .card-plan-btn { opacity: 1; }
+
+/* ── PLAN ADDER MODAL ──────────────────────────────── */
+.plan-adder-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text-3); margin-bottom: 8px;
+}
+.plan-adder-days {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.plan-adder-day-btn {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 6px 8px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--surface);
+  cursor: pointer; min-width: 40px; transition: all var(--transition);
+  font-size: 11px; color: var(--text-2);
+}
+.plan-adder-day-btn .pad-day { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.plan-adder-day-btn .pad-num { font-size: 16px; font-weight: 700; line-height: 1.1; color: var(--text-1); }
+.plan-adder-day-btn.active { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); }
+.plan-adder-day-btn.active .pad-num { color: var(--primary); }
+.plan-adder-toggle {
+  display: flex; gap: 8px;
+}
+.plan-adder-opt {
+  flex: 1; padding: 8px 4px; border-radius: var(--radius);
+  border: 1.5px solid var(--border); background: var(--surface);
+  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-2);
+  transition: all var(--transition);
+}
+.plan-adder-opt.active { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); }
 
 /* ── OVERLAYS & MODALS ───────────────────────────────── */
 .overlay {
