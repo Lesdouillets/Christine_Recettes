@@ -2019,7 +2019,7 @@ function renderPlanner() {
             <div class="planner-recipe-card">
               <button class="planner-remove" onclick="removePlanSlot('${key}','${meal}','${course}')">✕</button>
               ${catPillHtml(recipe.category)}
-              <div class="planner-recipe-name">${esc(recipe.name)}</div>
+              <div class="planner-recipe-name" onclick="openDetail('${recipeId}')" style="cursor:pointer">${esc(recipe.name)}</div>
             </div>`;
         } else {
           const btn = document.createElement('div');
