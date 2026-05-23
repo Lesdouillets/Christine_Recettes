@@ -58,10 +58,19 @@ firebase.initializeApp({
   messagingSenderId: "239169207922",
   appId:             "1:239169207922:web:1b3d67548cc7bbd8ad0ceb"
 });
-const db      = firebase.firestore();
-const STORE   = db.collection('data').doc('main');
-const PHOTOS  = db.collection('photos'); // chaque doc = { photo: "data:..." } pour un recipeId
-let _ownWrite = false; // évite re-render inutile sur notre propre écriture
+const db             = firebase.firestore();
+const STORE          = db.collection('data').doc('main');
+const PHOTOS         = db.collection('photos'); // chaque doc = { photo: "data:..." } pour un recipeId
+const SETTINGS_STORE = db.collection('data').doc('settings');
+const SHOP_STORE     = db.collection('data').doc('shop');
+let _ownWrite      = false; // évite re-render inutile sur notre propre écriture
+let _shopOwnWrite  = false;
+
+// ── PARAMÈTRES EN MÉMOIRE (chargés depuis Firestore) ──
+let _pin          = null;   // PIN de protection, null = aucun
+let _notifEnabled = false;  // notifications activées
+let _homePhoto    = '';     // URL photo page d'accueil
+let _resetAt      = 0;      // horodatage force-sync
 
 // ── SYSTÈME D'ACCÈS PAR PIN ────────────────────────────
 // Par défaut, l'app est en lecture seule.
@@ -69,22 +78,19 @@ let _ownWrite = false; // évite re-render inutile sur notre propre écriture
 // sessionStorage : déverrouillé jusqu'à fermeture de l'onglet.
 
 function _isUnlocked() {
-  const pin = localStorage.getItem('edit-pin');
-  if (!pin) return true; // aucun PIN défini = proprio sur son appareil
-  return localStorage.getItem('edit-unlocked') === '1';
+  if (!_pin) return true; // aucun PIN défini = proprio sur son appareil
+  return sessionStorage.getItem('edit-unlocked') === '1';
 }
 
 // Déverrouiller avec le PIN
 function unlockEdit() {
-  const pin = localStorage.getItem('edit-pin');
-  if (!pin) { sessionStorage.setItem('edit-unlocked', '1'); return true; }
+  if (!_pin) { sessionStorage.setItem('edit-unlocked', '1'); return true; }
   const entered = prompt('🔒 Code PIN pour modifier :');
   if (entered === null) return false;
-  if (entered === pin) {
+  if (entered === _pin) {
     sessionStorage.setItem('edit-unlocked', '1');
     document.documentElement.classList.remove('lecture-mode');
     toast('✓ Mode édition activé', 'success');
-    // Rafraîchir la vue courante pour montrer les boutons d'édition
     switchView(currentView);
     return true;
   } else {
@@ -101,19 +107,20 @@ function lockEdit() {
 }
 
 function setEditPin() {
-  const current = localStorage.getItem('edit-pin');
-  if (current && !_isUnlocked()) {
+  if (_pin && !_isUnlocked()) {
     toast('Déverrouillez d\'abord l\'app pour changer le PIN', 'error');
     return;
   }
   const newPin = prompt('Nouveau code PIN (4 chiffres) — laisser vide pour désactiver :');
   if (newPin === null) return;
   if (newPin === '') {
-    localStorage.removeItem('edit-pin');
+    _pin = null;
+    SETTINGS_STORE.set({ pin: null, notifEnabled: _notifEnabled, homePhoto: _homePhoto }, { merge: true }).catch(() => {});
     sessionStorage.setItem('edit-unlocked', '1');
     toast('✓ Protection PIN désactivée', 'success');
   } else if (/^\d{4,8}$/.test(newPin)) {
-    localStorage.setItem('edit-pin', newPin);
+    _pin = newPin;
+    SETTINGS_STORE.set({ pin: _pin, notifEnabled: _notifEnabled, homePhoto: _homePhoto }, { merge: true }).catch(() => {});
     sessionStorage.setItem('edit-unlocked', '1');
     toast('✓ PIN enregistré — partagez l\'URL sans le PIN !', 'success');
   } else {
@@ -162,45 +169,15 @@ let planAdderDate  = null;
 let planAdderMeal  = 'midi';
 let planAdderCourse = 'plat';
 
-// ── PHOTOS LOCALES (stockage séparé, jamais écrasé par Firebase) ──────────
-// { [recipeId]: "data:image/..." }
 // ── PHOTO STORE (cache mémoire uniquement — Firestore est la source de vérité) ──
-let _photoCache = null; // cache en mémoire, évite les lectures localStorage répétées
+let _photoCache = null;
 
 function loadPhotoStore() {
-  if (_photoCache) return _photoCache;
-  try { _photoCache = JSON.parse(localStorage.getItem('mes-recettes-photos') || '{}'); }
-  catch { _photoCache = {}; }
+  if (!_photoCache) _photoCache = {};
   return _photoCache;
 }
 function savePhotoStore(map) {
   _photoCache = map;
-  try { localStorage.setItem('mes-recettes-photos', JSON.stringify(map)); }
-  catch(e) {
-    // localStorage plein : on garde en mémoire uniquement (Firestore reste la source de vérité)
-    console.warn('localStorage photos plein, cache mémoire uniquement');
-  }
-}
-// Extrait les photos base64 des recettes → store séparé + nettoie mes-recettes
-function migratePhotosToStore(arr) {
-  const map = loadPhotoStore();
-  let hasNew = false;
-  arr.forEach(r => {
-    if (r.photo && r.photo.startsWith('data:') && !map[r.id]) {
-      map[r.id] = r.photo; hasNew = true;
-    }
-  });
-  if (hasNew) {
-    // Sauvegarder les photos dans le store séparé
-    savePhotoStore(map);
-    // Supprimer les photos de mes-recettes pour libérer de la place
-    const stripped = arr.map(r => {
-      if (r.photo && r.photo.startsWith('data:')) { const {photo,...rest}=r; return rest; }
-      return r;
-    });
-    try { localStorage.setItem('mes-recettes', JSON.stringify(stripped)); } catch(e) {}
-  }
-  return map;
 }
 // Fusionne les photos (cache mémoire) dans un tableau de recettes
 function mergePhotos(arr) {
@@ -239,38 +216,22 @@ async function loadPhotosFromCloud() {
 
 // ── PERSISTANCE ───────────────────────────────────────
 function load() {
-  // 0) Nettoyage : virer toute photo base64 du localStorage (Firestore = source des photos)
-  localStorage.removeItem('mes-recettes-photos');
-  try {
-    const raw = localStorage.getItem('mes-recettes');
-    if (raw && raw.includes('"data:')) {
-      const arr = JSON.parse(raw);
-      const stripped = arr.map(r => { const {photo,...rest}=r; return rest; });
-      localStorage.setItem('mes-recettes', JSON.stringify(stripped));
-    }
-  } catch(e) { localStorage.removeItem('mes-recettes'); }
-
-  // 1) Affichage immédiat depuis le cache local
-  try { recipes    = JSON.parse(localStorage.getItem('mes-recettes')         || '[]'); } catch { recipes = []; }
-  try { mealPlan   = JSON.parse(localStorage.getItem('mes-repas')            || '{}'); } catch { mealPlan = {}; }
-  try { customCats = JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { customCats = []; }
-  try { urlTodo    = JSON.parse(localStorage.getItem('mes-urls-todo')         || '[]'); } catch { urlTodo = []; }
-  loadShopItems();
-  loadCartSet();
+  // Initialiser les syncs temps réel
+  initSettingsSync();
+  initShopSync();
   migrateMealPlan();
   loadTodoLists();
   initTodoSync();
   initUrlTodoSync();
 
-  // 2b) Charger les photos depuis Firestore en arrière-plan (sync multi-appareils)
+  // Charger les photos depuis Firestore en arrière-plan
   loadPhotosFromCloud();
 
-  // 2) Synchronisation temps réel via Firebase
+  // Synchronisation temps réel des recettes via Firebase
   STORE.onSnapshot(snap => {
-    if (_ownWrite) { _ownWrite = false; return; } // ignorer nos propres écritures
+    if (_ownWrite) { _ownWrite = false; return; }
 
     if (!snap.exists) {
-      // Firebase vide mais localStorage a des données → migration automatique
       if (recipes.length > 0) {
         toast('Synchronisation vers le cloud en cours…', 'info');
         _ownWrite = true;
@@ -283,58 +244,43 @@ function load() {
 
     const d          = snap.data();
     const fbRecs     = d.recipes || [];
-    // Compatibilité : ancien champ modifiedAt ou nouveau lastModified
     const fbModified = d.lastModified || d.modifiedAt || 0;
     const lcCount    = recipes.filter(r => !String(r.id).startsWith('demo')).length;
 
-    // Force sync : si Firebase a un signal resetAt plus récent que ce qu'on a vu,
-    // on charge Firebase sans discussion, quelle que soit la situation locale
-    const fbResetAt    = d.resetAt || 0;
-    const localResetAt = parseInt(localStorage.getItem('_resetAt') || '0');
-    if (fbResetAt > localResetAt) {
-      localStorage.setItem('_resetAt', String(fbResetAt));
+    // Force sync si Firebase a un signal resetAt plus récent
+    const fbResetAt = d.resetAt || 0;
+    if (fbResetAt > _resetAt) {
+      _resetAt         = fbResetAt;
       recipes          = mergePhotos(fbRecs);
       mealPlan         = d.mealPlan   || {};
       customCats       = d.customCats || [];
       _localModifiedAt = fbModified;
-      try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
-      try { localStorage.setItem('mes-repas',    JSON.stringify(mealPlan)); } catch(e) {}
       renderSidebar(); renderTagCloud(); renderCatSelect(); render();
       return;
     }
 
-    // Firebase gagne si local n'a rien, ou si local a 30%+ de recettes de plus
-    // (signe que le local est périmé et n'a pas encore reçu la synchro)
     const localTooMany = fbRecs.length > 10 && lcCount > fbRecs.length * 1.3;
     if (lcCount === 0 || localTooMany) {
       recipes          = mergePhotos(fbRecs);
       mealPlan         = d.mealPlan   || {};
       customCats       = d.customCats || [];
       _localModifiedAt = fbModified;
-      try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
-      try { localStorage.setItem('mes-repas',    JSON.stringify(mealPlan)); } catch(e) {}
       renderSidebar(); renderTagCloud(); renderCatSelect(); render();
       return;
     }
 
-    // Local gagne uniquement s'il a été modifié plus récemment que Firebase
     const localWins = _localModifiedAt > 0 && _localModifiedAt > fbModified;
     if (localWins) {
-      // Local plus récent → pousser vers Firebase en préservant resetAt
-      const savedResetAt = parseInt(localStorage.getItem('_resetAt') || '0');
       _ownWrite = true;
       STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats,
                   lastModified: _localModifiedAt,
-                  ...(savedResetAt ? { resetAt: savedResetAt } : {}) })
+                  ...(_resetAt ? { resetAt: _resetAt } : {}) })
         .catch(() => { _ownWrite = false; });
     } else {
-      // Firebase plus récent (autre appareil) → charger depuis Firebase
       recipes          = mergePhotos(fbRecs);
       mealPlan         = d.mealPlan   || {};
       customCats       = d.customCats || [];
       _localModifiedAt = fbModified;
-      try { localStorage.setItem('mes-recettes', JSON.stringify(recipes)); } catch(e) {}
-      try { localStorage.setItem('mes-repas',    JSON.stringify(mealPlan)); } catch(e) {}
       renderSidebar(); renderTagCloud(); renderCatSelect(); render();
     }
   }, err => console.warn('Firebase sync:', err));
@@ -352,23 +298,43 @@ function stripForCloud(arr) {
 }
 
 function save() {
-  // Cache local (peut échouer si localStorage plein — on continue quand même)
-  try {
-    const stripped = stripForCloud(recipes); // sans base64 pour économiser l'espace
-    localStorage.setItem('mes-recettes',          JSON.stringify(stripped));
-    localStorage.setItem('mes-repas',             JSON.stringify(mealPlan));
-    localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
-  } catch(e) {
-    console.warn('localStorage plein, sauvegarde Firebase uniquement');
-  }
-  // Sauvegarde Firebase (source de vérité)
   _localModifiedAt = Date.now();
-  const payload = stripForCloud(recipes);
-  // Conserver le resetAt existant pour ne pas casser le mécanisme de force-sync
-  const savedResetAt = parseInt(localStorage.getItem('_resetAt') || '0');
   _ownWrite = true;
-  STORE.set({ recipes: payload, mealPlan, customCats, lastModified: _localModifiedAt, ...(savedResetAt ? { resetAt: savedResetAt } : {}) })
+  STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats,
+              lastModified: _localModifiedAt, ...(_resetAt ? { resetAt: _resetAt } : {}) })
     .catch(e => { _ownWrite = false; toast('⚠️ Erreur synchro cloud : ' + e.message, 'error'); console.warn('Firebase save:', e); });
+}
+
+// ── PARAMÈTRES FIRESTORE ──────────────────────────────
+function saveSettings() {
+  SETTINGS_STORE.set({ pin: _pin || null, notifEnabled: _notifEnabled, homePhoto: _homePhoto }, { merge: true })
+    .catch(e => console.warn('settings save:', e));
+}
+
+function initSettingsSync() {
+  SETTINGS_STORE.onSnapshot(snap => {
+    if (!snap.exists) return;
+    const d = snap.data();
+    _pin          = d.pin || null;
+    _notifEnabled = !!d.notifEnabled;
+    _homePhoto    = d.homePhoto || '';
+    if (LECTURE_MODE()) document.documentElement.classList.add('lecture-mode');
+    else document.documentElement.classList.remove('lecture-mode');
+    if (currentView === 'settings') initSettingsView();
+    if (currentView === 'home') renderHomeView();
+  }, () => {});
+}
+
+// ── COURSES FIRESTORE ─────────────────────────────────
+function initShopSync() {
+  SHOP_STORE.onSnapshot(snap => {
+    if (_shopOwnWrite) { _shopOwnWrite = false; return; }
+    if (!snap.exists) return;
+    const d = snap.data();
+    shopItems = d.items || [];
+    cartSet   = new Set(d.cart || []);
+    if (currentView === 'shop') renderShopView();
+  }, () => {});
 }
 
 // ── CATÉGORIES ────────────────────────────────────────
@@ -622,7 +588,6 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 const URL_TODO_STORE = db.collection('data').doc('url-todo');
 
 function saveUrlTodo() {
-  try { localStorage.setItem('mes-urls-todo', JSON.stringify(urlTodo)); } catch(e) {}
   URL_TODO_STORE.set({ urls: urlTodo }).catch(e => console.warn('url-todo sync:', e));
 }
 
@@ -630,14 +595,12 @@ function initUrlTodoSync() {
   URL_TODO_STORE.onSnapshot(snap => {
     if (!snap.exists) return;
     const remote = snap.data().urls || [];
-    // Fusionner : garder les URLs locales + distantes (union par URL)
     const merged = [...urlTodo];
     remote.forEach(r => {
       if (!merged.find(l => l.url === r.url)) merged.push(r);
     });
     if (merged.length !== urlTodo.length) {
       urlTodo = merged;
-      try { localStorage.setItem('mes-urls-todo', JSON.stringify(urlTodo)); } catch(e) {}
       renderUrlTodo();
     }
   }, () => {});
@@ -2346,23 +2309,20 @@ function initPullToRefresh() {
 
 // ── SETTINGS VIEW ─────────────────────────────────────
 function initSettingsView() {
-  // État du PIN
-  const pin = localStorage.getItem('edit-pin');
   const pinLabel = document.getElementById('pin-label');
   const pinDesc  = document.getElementById('pin-desc');
   const lockBtn  = document.getElementById('lock-btn');
-  if (pinLabel) pinLabel.textContent = pin ? 'Modifier le code PIN' : 'Définir un code PIN';
-  if (pinDesc)  pinDesc.textContent  = pin
+  if (pinLabel) pinLabel.textContent = _pin ? 'Modifier le code PIN' : 'Définir un code PIN';
+  if (pinDesc)  pinDesc.textContent  = _pin
     ? (_isUnlocked() ? '✅ PIN activé — édition déverrouillée cette session' : '🔒 PIN activé — lecture seule')
     : 'Aucun PIN — définir un code pour protéger l\'édition';
-  if (lockBtn)  lockBtn.style.display = (_isUnlocked() && pin) ? '' : 'none';
+  if (lockBtn)  lockBtn.style.display = (_isUnlocked() && _pin) ? '' : 'none';
 
-  // Mettre à jour l'état du toggle notifications
   const toggle = document.getElementById('notif-toggle');
   const desc   = document.getElementById('notif-desc');
   if (!toggle) return;
   const perm = Notification.permission;
-  toggle.checked = perm === 'granted' && localStorage.getItem('notif-enabled') === '1';
+  toggle.checked = perm === 'granted' && _notifEnabled;
   if (perm === 'denied') {
     desc.textContent = 'Notifications bloquées dans les réglages du navigateur';
     toggle.disabled = true;
@@ -2386,7 +2346,8 @@ function copyReadOnlyLink() {
 async function toggleNotifications(enabled) {
   const desc = document.getElementById('notif-desc');
   if (!enabled) {
-    localStorage.removeItem('notif-enabled');
+    _notifEnabled = false;
+    saveSettings();
     if (desc) desc.textContent = 'Rappels planning et to-do';
     return;
   }
@@ -2397,11 +2358,13 @@ async function toggleNotifications(enabled) {
   }
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
-    localStorage.setItem('notif-enabled', '1');
+    _notifEnabled = true;
+    saveSettings();
     if (desc) desc.textContent = 'Activées — rappels planning et to-do';
     toast('✓ Notifications activées !', 'success');
   } else {
-    localStorage.removeItem('notif-enabled');
+    _notifEnabled = false;
+    saveSettings();
     document.getElementById('notif-toggle').checked = false;
     if (desc) desc.textContent = 'Notifications refusées dans le navigateur';
     toast('Autorisez les notifications dans les réglages du navigateur', 'error');
@@ -2450,31 +2413,21 @@ function initSidebarEvents() {
 
 // ── EXPORT ────────────────────────────────────────────
 function forceSyncToCloud() {
-  let localRecipes;
-  try { localRecipes = JSON.parse(localStorage.getItem('mes-recettes') || '[]'); } catch { localRecipes = []; }
-  const real = localRecipes.filter(r => !String(r.id).startsWith('demo'));
-
-  console.log('[Sync] Recettes locales:', localRecipes.length, '| Sans démos:', real.length);
-
+  const real = recipes.filter(r => !String(r.id).startsWith('demo'));
   if (!real.length) {
-    toast('Aucune recette trouvée dans ce navigateur', 'info');
-    alert(`Aucune recette à synchroniser.\n\nCette fonction doit être utilisée sur l'ordinateur qui contient vos ${real.length} recettes.\n\nOuvrez le site dans votre navigateur habituel (pas ici) et cliquez Sync cloud.`);
+    toast('Aucune recette à synchroniser', 'info');
     return;
   }
-
   if (!confirm(`Envoyer ${real.length} recettes vers Firebase ?\n\nCela remplacera les données existantes sur tous vos appareils.`)) return;
-
   toast(`Envoi de ${real.length} recettes…`, 'info');
   STORE.set({ recipes: stripForCloud(real), mealPlan, customCats })
     .then(() => {
       recipes = real;
-      localStorage.setItem('mes-recettes', JSON.stringify(real));
       render(); renderSidebar();
       toast(`✓ ${real.length} recettes synchronisées !`);
     })
     .catch(e => {
-      console.error('[Sync] Erreur Firebase:', e);
-      alert('Erreur Firebase : ' + e.message + '\n\nVérifiez votre connexion internet et les règles Firestore.');
+      alert('Erreur Firebase : ' + e.message);
       toast('Erreur de synchronisation', 'error');
     });
 }
@@ -2486,16 +2439,12 @@ function forceLoadFromCloud() {
     const d = snap.data();
     const fbRecipes = d.recipes || [];
     if (!fbRecipes.length) { toast('Firebase est vide', 'error'); return; }
-    if (!confirm(`Charger ${fbRecipes.length} recettes depuis Firebase ?\n\nVos recettes locales (${recipes.length}) seront remplacées.`)) return;
+    if (!confirm(`Charger ${fbRecipes.length} recettes depuis Firebase ?\n\nVos recettes en mémoire (${recipes.length}) seront remplacées.`)) return;
     recipes = mergePhotos(fbRecipes);
     mealPlan = d.mealPlan || {};
     customCats = d.customCats || [];
-    localStorage.setItem('mes-recettes', JSON.stringify(recipes));
-    localStorage.setItem('mes-repas', JSON.stringify(mealPlan));
-    localStorage.setItem('mes-categories-custom', JSON.stringify(customCats));
     render(); renderSidebar(); renderTagCloud(); renderCatSelect();
     toast(`✓ ${fbRecipes.length} recettes chargées depuis Firebase !`);
-    // Charger aussi les photos depuis Firestore
     loadPhotosFromCloud();
   }).catch(e => {
     alert('Erreur Firebase : ' + e.message);
@@ -2530,19 +2479,13 @@ document.addEventListener('click', e => {
 });
 function openShop() { openShopping(); }
 
-// ── LISTE DE COURSES PERSISTANTE ──────────────────────
-function loadShopItems() {
-  try { shopItems = JSON.parse(localStorage.getItem('mes-courses') || '[]'); } catch { shopItems = []; }
-}
+// ── LISTE DE COURSES PERSISTANTE (Firestore) ──────────
 function saveShopItems() {
-  try { localStorage.setItem('mes-courses', JSON.stringify(shopItems)); } catch(e) {}
+  _shopOwnWrite = true;
+  SHOP_STORE.set({ items: shopItems, cart: [...cartSet] })
+    .catch(() => { _shopOwnWrite = false; });
 }
-function loadCartSet() {
-  try { cartSet = new Set(JSON.parse(localStorage.getItem('mes-courses-cart') || '[]')); } catch { cartSet = new Set(); }
-}
-function saveCartSet() {
-  try { localStorage.setItem('mes-courses-cart', JSON.stringify([...cartSet])); } catch(e) {}
-}
+function saveCartSet() { saveShopItems(); }
 function initShopAisleSelect() {
   const sel = document.getElementById('shop-add-aisle');
   if (!sel || sel.children.length > 1) return;
@@ -2696,17 +2639,9 @@ const ASSIGNEES = {
 };
 // ── Persistance ───────────────────────────────────────
 function loadTodoLists() {
-  try { todoLists = JSON.parse(localStorage.getItem('mes-todo-lists') || 'null'); } catch { todoLists = null; }
-  if (!todoLists) {
-    // Migration depuis l'ancien format
-    let oldItems = [];
-    try { oldItems = JSON.parse(localStorage.getItem('mes-todo') || '[]'); } catch {}
-    todoLists = DEFAULT_TODO_LISTS.map(l => ({ ...l, items: [...l.items] }));
-    if (oldItems.length) todoLists[0].items = oldItems; // migration dans Général
-  }
+  todoLists = DEFAULT_TODO_LISTS.map(l => ({ ...l, items: [...l.items] }));
 }
 function saveTodoLists() {
-  try { localStorage.setItem('mes-todo-lists', JSON.stringify(todoLists)); } catch(e) {}
   TODO_STORE.set({ lists: todoLists, v: 2 }).catch(e => console.warn('todo sync:', e));
 }
 function initTodoSync() {
@@ -2714,12 +2649,10 @@ function initTodoSync() {
     if (!snap.exists) return;
     const d = snap.data();
     if (d.v === 2 && d.lists) {
-      // Nouveau format multi-listes : prendre si plus récent (plus de listes ou plus d'items)
       const remoteTotal = d.lists.reduce((s, l) => s + l.items.length, 0);
       const localTotal  = todoLists.reduce((s, l) => s + l.items.length, 0);
       if (remoteTotal >= localTotal) {
-        // Détecter les nouvelles tâches pour les notifications
-        if (remoteTotal > localTotal && Notification.permission === 'granted' && localStorage.getItem('notif-enabled') === '1') {
+        if (remoteTotal > localTotal && Notification.permission === 'granted' && _notifEnabled) {
           const localIds = new Set(todoLists.flatMap(l => l.items.map(i => i.id)));
           const newItems = d.lists.flatMap(l => l.items).filter(i => !localIds.has(i.id));
           newItems.forEach(i => {
@@ -2728,7 +2661,6 @@ function initTodoSync() {
           });
         }
         todoLists = d.lists;
-        try { localStorage.setItem('mes-todo-lists', JSON.stringify(todoLists)); } catch(e) {}
         if (currentView === 'todo') renderTodoView();
       }
     }
@@ -3010,7 +2942,7 @@ function loadDemo() {
 function renderHomeView() {
   const container = document.getElementById('home-container');
   if (!container) return;
-  const homePhoto = localStorage.getItem('home-photo') || '';
+  const homePhoto = _homePhoto;
   const recipeCount = recipes.length;
   const pendingTodo = todoLists.reduce((s,l) => s + l.items.filter(i => !i.done).length, 0);
   container.innerHTML = `
@@ -3065,7 +2997,8 @@ async function changeHomePhoto(event) {
   toast('⏳ Upload…');
   try {
     const url = await uploadToCloudinary(file);
-    localStorage.setItem('home-photo', url);
+    _homePhoto = url;
+    saveSettings();
     renderHomeView();
     toast('✓ Photo mise à jour !', 'success');
   } catch(e) {
