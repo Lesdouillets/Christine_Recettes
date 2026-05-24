@@ -216,6 +216,12 @@ async function loadPhotosFromCloud() {
 
 // ── PERSISTANCE ───────────────────────────────────────
 function load() {
+  // Migration unique depuis localStorage (si les données n'ont pas encore été poussées vers Firestore)
+  const _lsRecipes    = (() => { try { return JSON.parse(localStorage.getItem('mes-recettes') || '[]'); } catch { return []; } })();
+  const _lsMealPlan   = (() => { try { return JSON.parse(localStorage.getItem('mes-repas')    || '{}'); } catch { return {}; } })();
+  const _lsCustomCats = (() => { try { return JSON.parse(localStorage.getItem('mes-categories-custom') || '[]'); } catch { return []; } })();
+  const _lsModifiedAt = parseInt(localStorage.getItem('_modifiedAt') || '0');
+
   // Initialiser les syncs temps réel
   initSettingsSync();
   initShopSync();
@@ -232,11 +238,19 @@ function load() {
     if (_ownWrite) { _ownWrite = false; return; }
 
     if (!snap.exists) {
-      if (recipes.length > 0) {
-        toast('Synchronisation vers le cloud en cours…', 'info');
-        _ownWrite = true;
-        STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats })
-          .then(() => toast(`✓ ${recipes.length} recettes synchronisées sur tous vos appareils`))
+      // Firebase vide : migration depuis localStorage si disponible
+      const migratedRecs = _lsRecipes.filter(r => !String(r.id).startsWith('demo'));
+      if (migratedRecs.length > 0) {
+        toast(`Migration de ${migratedRecs.length} recettes vers le cloud…`, 'info');
+        recipes    = migratedRecs;
+        mealPlan   = _lsMealPlan;
+        customCats = _lsCustomCats;
+        _ownWrite  = true;
+        STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats, lastModified: Date.now() })
+          .then(() => {
+            toast(`✓ ${recipes.length} recettes récupérées !`);
+            renderSidebar(); renderTagCloud(); renderCatSelect(); render();
+          })
           .catch(() => { _ownWrite = false; });
       }
       return;
@@ -245,7 +259,10 @@ function load() {
     const d          = snap.data();
     const fbRecs     = d.recipes || [];
     const fbModified = d.lastModified || d.modifiedAt || 0;
-    const lcCount    = recipes.filter(r => !String(r.id).startsWith('demo')).length;
+    // lcCount tient compte des recettes en mémoire ET d'un éventuel localStorage non encore migré
+    const memCount   = recipes.filter(r => !String(r.id).startsWith('demo')).length;
+    const lsCount    = _lsRecipes.filter(r => !String(r.id).startsWith('demo')).length;
+    const lcCount    = Math.max(memCount, lsCount);
 
     // Force sync si Firebase a un signal resetAt plus récent
     const fbResetAt = d.resetAt || 0;
@@ -269,11 +286,20 @@ function load() {
       return;
     }
 
-    const localWins = _localModifiedAt > 0 && _localModifiedAt > fbModified;
+    // Le localStorage est plus récent que Firebase → on le migre vers Firebase
+    const lsWins = lsCount > 0 && _lsModifiedAt > fbModified;
+    const localWins = (_localModifiedAt > 0 && _localModifiedAt > fbModified) || lsWins;
     if (localWins) {
+      // Si c'est le localStorage qui gagne, on charge ses données en mémoire d'abord
+      if (lsWins && memCount === 0) {
+        recipes    = _lsRecipes.filter(r => !String(r.id).startsWith('demo'));
+        mealPlan   = _lsMealPlan;
+        customCats = _lsCustomCats;
+        renderSidebar(); renderTagCloud(); renderCatSelect(); render();
+      }
       _ownWrite = true;
       STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats,
-                  lastModified: _localModifiedAt,
+                  lastModified: _localModifiedAt || Date.now(),
                   ...(_resetAt ? { resetAt: _resetAt } : {}) })
         .catch(() => { _ownWrite = false; });
     } else {
@@ -299,6 +325,8 @@ function stripForCloud(arr) {
 
 function save() {
   _localModifiedAt = Date.now();
+  // Conserver _modifiedAt dans localStorage pour aider la migration multi-appareils
+  try { localStorage.setItem('_modifiedAt', String(_localModifiedAt)); } catch(e) {}
   _ownWrite = true;
   STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats,
               lastModified: _localModifiedAt, ...(_resetAt ? { resetAt: _resetAt } : {}) })
