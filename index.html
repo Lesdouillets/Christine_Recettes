@@ -241,6 +241,15 @@
             </span>
             <span class="settings-row-arrow">›</span>
           </button>
+          <label class="settings-row" style="cursor:pointer">
+            <span class="settings-row-icon">📂</span>
+            <span class="settings-row-text">
+              <span class="settings-row-label">Restaurer une sauvegarde</span>
+              <span class="settings-row-desc">Importer un fichier JSON sans rien effacer</span>
+            </span>
+            <span class="settings-row-arrow">›</span>
+            <input type="file" accept=".json,application/json" style="display:none" onchange="importBackup(event)">
+          </label>
         </div>
 
         <div class="settings-section">

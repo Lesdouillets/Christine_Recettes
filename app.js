@@ -2498,6 +2498,42 @@ function exportRecipes() {
   toast(`${recipes.length} recettes exportées ✓`);
 }
 
+function importBackup(event) {
+  const file = event.target.files[0];
+  event.target.value = ''; // reset pour permettre de re-sélectionner le même fichier
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let data;
+    try { data = JSON.parse(e.target.result); } catch { toast('Fichier JSON invalide', 'error'); return; }
+    const list = Array.isArray(data) ? data : [data];
+    if (!list.length) { toast('Fichier vide', 'error'); return; }
+
+    // Fusionner : on ajoute uniquement les recettes absentes (par ID)
+    const existingIds = new Set(recipes.map(r => String(r.id)));
+    let added = 0;
+    list.forEach(r => {
+      if (!r.name) return; // recette invalide
+      if (existingIds.has(String(r.id))) return; // déjà présente
+      // Supprimer les photos base64 (trop lourdes pour Firestore)
+      const safe = { ...r };
+      if (safe.photo && safe.photo.startsWith('data:')) delete safe.photo;
+      recipes.push(safe);
+      existingIds.add(String(safe.id));
+      added++;
+    });
+
+    if (!added) {
+      toast(`Toutes les recettes sont déjà présentes (${list.length})`, 'info');
+      return;
+    }
+    save();
+    render(); renderSidebar(); renderTagCloud();
+    toast(`✓ ${added} recette${added > 1 ? 's' : ''} restaurée${added > 1 ? 's' : ''} dans le cloud`);
+  };
+  reader.readAsText(file);
+}
+
 // ── MENU "···" ────────────────────────────────────────
 function toggleMoreMenu() {
   const m = document.getElementById('hbtn-more-menu');
