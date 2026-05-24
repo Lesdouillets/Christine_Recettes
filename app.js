@@ -286,21 +286,25 @@ function load() {
       return;
     }
 
-    // Le localStorage est plus récent que Firebase → on le migre vers Firebase
-    const lsWins = lsCount > 0 && _lsModifiedAt > fbModified;
+    // localStorage gagne si : il a plus de recettes que Firebase (migration)
+    // OU s'il a été modifié plus récemment (timestamp)
+    const lsHasMore = lsCount > fbRecs.length;
+    const lsWins    = lsCount > 0 && (lsHasMore || _lsModifiedAt > fbModified);
     const localWins = (_localModifiedAt > 0 && _localModifiedAt > fbModified) || lsWins;
     if (localWins) {
-      // Si c'est le localStorage qui gagne, on charge ses données en mémoire d'abord
-      if (lsWins && memCount === 0) {
+      // Charger le localStorage en mémoire si plus complet
+      if (lsWins) {
         recipes    = _lsRecipes.filter(r => !String(r.id).startsWith('demo'));
         mealPlan   = _lsMealPlan;
         customCats = _lsCustomCats;
+        toast(`Récupération de ${recipes.length} recettes depuis ce navigateur…`, 'info');
         renderSidebar(); renderTagCloud(); renderCatSelect(); render();
       }
       _ownWrite = true;
       STORE.set({ recipes: stripForCloud(recipes), mealPlan, customCats,
-                  lastModified: _localModifiedAt || Date.now(),
+                  lastModified: Date.now(),
                   ...(_resetAt ? { resetAt: _resetAt } : {}) })
+        .then(() => lsWins && toast(`✓ ${recipes.length} recettes synchronisées sur le cloud !`))
         .catch(() => { _ownWrite = false; });
     } else {
       recipes          = mergePhotos(fbRecs);
