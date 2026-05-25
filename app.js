@@ -3003,7 +3003,9 @@ function loadDemo() {
       dateAdded: new Date().toISOString(),
     },
   ];
-  save();
+  // NE PAS appeler save() ici : les démos sont juste en mémoire pour les nouveaux utilisateurs.
+  // Si on sauvegardait, on écraserait Firebase avant que le snapshot arrive avec les vraies recettes.
+  render();
 }
 
 // ── HOME (BUREAU) ─────────────────────────────────────
